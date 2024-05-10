@@ -16,7 +16,7 @@
 	} from '$lib/apis/chats';
 	import { toast } from 'svelte-sonner';
 	import { fade, slide } from 'svelte/transition';
-	import { WEBUI_BASE_PATH } from '$lib/constants';
+	import { WEBUI_BASE_URL, WEBUI_BASE_PATH } from '$lib/constants';
 	import Tooltip from '../common/Tooltip.svelte';
 	import ChatMenu from './Sidebar/ChatMenu.svelte';
 	import ShareChatModal from '../chat/ShareChatModal.svelte';
@@ -215,7 +215,7 @@
 				<div class="flex self-center">
 					<div class="self-center mr-1.5">
 						<img
-							src="{WEBUI_BASE_PATH}/static/favicon.png"
+							src="{WEBUI_BASE_URL}/static/favicon.png"
 							class=" size-6 -translate-x-1.5 rounded-full"
 							alt="logo"
 						/>
