@@ -17,6 +17,10 @@ TAGS
 # C extensions
 *.so
 
+# Pyodide distribution
+static/pyodide/*
+!static/pyodide/pyodide-lock.json
+
 # Distribution / packaging
 .Python
 build/

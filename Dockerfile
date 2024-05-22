@@ -11,9 +11,9 @@ ARG USE_CUDA_VER=cu121
 # IMPORTANT: If you change the embedding model (sentence-transformers/all-MiniLM-L6-v2) and vice versa, you aren't able to use RAG Chat with your previous documents loaded in the WebUI! You need to re-embed them.
 ARG USE_EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
 ARG USE_RERANKING_MODEL=""
-# Set the uid/gid used (requirement while mounting shared directory)
-ARG UID=5000
-ARG GID=5000
+# Override at your own risk - non-root configurations are untested
+ARG UID=0
+ARG GID=0
 
 ######## WebUI frontend ########
 FROM --platform=$BUILDPLATFORM node:21-alpine3.19 as build
@@ -86,46 +86,57 @@ RUN groupadd -g ${GID} -o webui
 RUN useradd -u ${UID} -g ${GID} webui -m -d /app/backend
 
 ENV HOME /root
+# Create user and group if not root
+RUN if [ $UID -ne 0 ]; then \
+      if [ $GID -ne 0 ]; then \
+        addgroup --gid $GID app; \
+      fi; \
+      adduser --uid $UID --gid $GID --home $HOME --disabled-password --no-create-home app; \
+    fi
+
 RUN mkdir -p $HOME/.cache/chroma
 RUN echo -n 00000000-0000-0000-0000-000000000000 > $HOME/.cache/chroma/telemetry_user_id
 
+# Make sure the user has access to the app and root directory
+RUN chown -R $UID:$GID /app $HOME
+
 RUN if [ "$USE_OLLAMA" = "true" ]; then \
-        apt-get update && \
-        # Install pandoc and netcat
-        apt-get install -y --no-install-recommends pandoc netcat-openbsd curl && \
-        # for RAG OCR
-        apt-get install -y --no-install-recommends ffmpeg libsm6 libxext6 && \
-        # install helper tools
-        apt-get install -y --no-install-recommends curl && \
-        # install ollama
-        curl -fsSL https://ollama.com/install.sh | sh && \
-        # cleanup
-        rm -rf /var/lib/apt/lists/*; \
+    apt-get update && \
+    # Install pandoc and netcat
+    apt-get install -y --no-install-recommends pandoc netcat-openbsd curl && \
+    # for RAG OCR
+    apt-get install -y --no-install-recommends ffmpeg libsm6 libxext6 && \
+    # install helper tools
+    apt-get install -y --no-install-recommends curl jq && \
+    # install ollama
+    curl -fsSL https://ollama.com/install.sh | sh && \
+    # cleanup
+    rm -rf /var/lib/apt/lists/*; \
     else \
-        apt-get update && \
-        # Install pandoc and netcat
-        apt-get install -y --no-install-recommends pandoc netcat-openbsd curl && \
-        # for RAG OCR
-        apt-get install -y --no-install-recommends ffmpeg libsm6 libxext6 && \
-        # cleanup
-        rm -rf /var/lib/apt/lists/*; \
+    apt-get update && \
+    # Install pandoc and netcat
+    apt-get install -y --no-install-recommends pandoc netcat-openbsd curl jq && \
+    # for RAG OCR
+    apt-get install -y --no-install-recommends ffmpeg libsm6 libxext6 && \
+    # cleanup
+    rm -rf /var/lib/apt/lists/*; \
     fi
 
 # install python dependencies
-COPY ./backend/requirements.txt ./requirements.txt
+COPY --chown=$UID:$GID ./backend/requirements.txt ./requirements.txt
 
 RUN pip3 install uv && \
     if [ "$USE_CUDA" = "true" ]; then \
-        # If you use CUDA the whisper and embedding model will be downloaded on first use
-        pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/$USE_CUDA_DOCKER_VER --no-cache-dir && \
-        uv pip install --system -r requirements.txt --no-cache-dir && \
-        python -c "import os; from sentence_transformers import SentenceTransformer; SentenceTransformer(os.environ['RAG_EMBEDDING_MODEL'], device='cpu')" && \
-        python -c "import os; from faster_whisper import WhisperModel; WhisperModel(os.environ['WHISPER_MODEL'], device='cpu', compute_type='int8', download_root=os.environ['WHISPER_MODEL_DIR'])"; \
+    # If you use CUDA the whisper and embedding model will be downloaded on first use
+    pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/$USE_CUDA_DOCKER_VER --no-cache-dir && \
+    uv pip install --system -r requirements.txt --no-cache-dir && \
+    python -c "import os; from sentence_transformers import SentenceTransformer; SentenceTransformer(os.environ['RAG_EMBEDDING_MODEL'], device='cpu')" && \
+    python -c "import os; from faster_whisper import WhisperModel; WhisperModel(os.environ['WHISPER_MODEL'], device='cpu', compute_type='int8', download_root=os.environ['WHISPER_MODEL_DIR'])"; \
     else \
-        pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu --no-cache-dir && \
-        uv pip install --system -r requirements.txt --no-cache-dir && \
-        python -c "import os; from sentence_transformers import SentenceTransformer; SentenceTransformer(os.environ['RAG_EMBEDDING_MODEL'], device='cpu')" && \
-        python -c "import os; from faster_whisper import WhisperModel; WhisperModel(os.environ['WHISPER_MODEL'], device='cpu', compute_type='int8', download_root=os.environ['WHISPER_MODEL_DIR'])"; \
+    pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu --no-cache-dir && \
+    uv pip install --system -r requirements.txt --no-cache-dir && \
+    python -c "import os; from sentence_transformers import SentenceTransformer; SentenceTransformer(os.environ['RAG_EMBEDDING_MODEL'], device='cpu')" && \
+    python -c "import os; from faster_whisper import WhisperModel; WhisperModel(os.environ['WHISPER_MODEL'], device='cpu', compute_type='int8', download_root=os.environ['WHISPER_MODEL_DIR'])"; \
     fi
 
 
@@ -135,17 +146,18 @@ RUN pip3 install uv && \
 # COPY --from=build /app/onnx /root/.cache/chroma/onnx_models/all-MiniLM-L6-v2/onnx
 
 # copy built frontend files
-COPY --from=build /app/build /app/build
-COPY --from=build /app/CHANGELOG.md /app/CHANGELOG.md
-COPY --from=build /app/package.json /app/package.json
+COPY --chown=$UID:$GID --from=build /app/build /app/build
+COPY --chown=$UID:$GID --from=build /app/CHANGELOG.md /app/CHANGELOG.md
+COPY --chown=$UID:$GID --from=build /app/package.json /app/package.json
 
 # copy backend files
-COPY ./backend .
-RUN cp -p /app/build/index.html /app/build/index.html.am ; chown -R webui:webui /app
+COPY --chown=$UID:$GID ./backend .
 
 USER webui
 EXPOSE 8080
 
-HEALTHCHECK CMD curl --fail http://localhost:8080 || exit 1 
+HEALTHCHECK CMD curl --silent --fail http://localhost:8080/health | jq -e '.status == true' || exit 1
+
+USER $UID:$GID
 
 CMD [ "bash", "start.sh"]

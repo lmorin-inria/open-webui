@@ -1,6 +1,6 @@
 <script>
 	import { onMount, tick, setContext } from 'svelte';
-	import { config, user, theme, WEBUI_NAME } from '$lib/stores';
+	import { config, user, theme, WEBUI_NAME, mobile } from '$lib/stores';
 	import { goto } from '$app/navigation';
 	import { Toaster, toast } from 'svelte-sonner';
 
@@ -18,9 +18,22 @@
 	setContext('i18n', i18n);
 
 	let loaded = false;
+	const BREAKPOINT = 768;
 
 	onMount(async () => {
 		theme.set(localStorage.theme);
+
+		mobile.set(window.innerWidth < BREAKPOINT);
+		const onResize = () => {
+			if (window.innerWidth < BREAKPOINT) {
+				mobile.set(true);
+			} else {
+				mobile.set(false);
+			}
+		};
+
+		window.addEventListener('resize', onResize);
+
 		let backendConfig = null;
 		try {
 			backendConfig = await getBackendConfig();
@@ -67,12 +80,16 @@
 
 		document.getElementById('splash-screen')?.remove();
 		loaded = true;
+
+		return () => {
+			window.removeEventListener('resize', onResize);
+		};
 	});
 </script>
 
 <svelte:head>
 	<title>{$WEBUI_NAME}</title>
-	<link rel="icon" href="{WEBUI_BASE_URL}/static/favicon.png" />
+	<link crossorigin="anonymous" rel="icon" href="{WEBUI_BASE_URL}/static/favicon.png" />
 
 	<!-- rosepine themes have been disabled as it's not up to date with our latest version. -->
 	<!-- feel free to make a PR to fix if anyone wants to see it return -->
