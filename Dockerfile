@@ -25,6 +25,7 @@ RUN npm ci
 
 COPY src src
 COPY static static
+COPY scripts/prepare-pyodide.js ./scripts/prepare-pyodide.js
 COPY *.js *.json *.ts .npmrc CHANGELOG.md ./
 RUN npm run build
 
@@ -81,9 +82,6 @@ ENV HF_HOME="/app/backend/data/cache/embedding/models"
 #### Other models ##########################################################
 
 WORKDIR /app/backend
-# To run as root creates uses while mounting 
-RUN groupadd -g ${GID} -o webui
-RUN useradd -u ${UID} -g ${GID} webui -m -d /app/backend
 
 ENV HOME /root
 # Create user and group if not root
@@ -152,8 +150,8 @@ COPY --chown=$UID:$GID --from=build /app/package.json /app/package.json
 
 # copy backend files
 COPY --chown=$UID:$GID ./backend .
+RUN cp -p /app/build/index.html /app/build/index.html.am
 
-USER webui
 EXPOSE 8080
 
 HEALTHCHECK CMD curl --silent --fail http://localhost:8080/health | jq -e '.status == true' || exit 1

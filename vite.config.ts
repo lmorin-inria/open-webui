@@ -22,7 +22,7 @@ export default defineConfig({
 	},
 	build: {
 		minify: true
-        }
+        },
 	worker: {
 		format: 'es'
 	}
