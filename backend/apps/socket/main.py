@@ -1,12 +1,12 @@
 import socketio
 import asyncio
 
-
+from config import FRONTEND_APP_ROOT
 from apps.webui.models.users import Users
 from utils.utils import decode_token
 
 sio = socketio.AsyncServer(cors_allowed_origins=[], async_mode="asgi")
-app = socketio.ASGIApp(sio, socketio_path="/ws/socket.io")
+app = socketio.ASGIApp(sio, socketio_path=FRONTEND_APP_ROOT + "/ws/socket.io")
 
 # Dictionary to maintain the user pool
 

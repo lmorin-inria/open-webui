@@ -28,7 +28,7 @@
 
 	import 'tippy.js/dist/tippy.css';
 
-	import { WEBUI_BASE_URL, WEBUI_HOSTNAME, WEBUI_BASE_PATH } from '$lib/constants';
+	import { WEBUI_BASE_URL, WEBUI_HOSTNAME, WEBUI_BASE_PATH, WEBUI_PREFIX } from '$lib/constants';
 	import i18n, { initI18n, getLanguages } from '$lib/i18n';
 
 	setContext('i18n', i18n);
@@ -75,7 +75,7 @@
 
 			if ($config) {
 				const _socket = io(`${WEBUI_BASE_URL}`, {
-					path: '/ws/socket.io',
+					path: '/'+WEBUI_PREFIX+'/ws/socket.io',
 					auth: { token: localStorage.token }
 				});
 
