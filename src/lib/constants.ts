@@ -4,19 +4,20 @@ import { browser, dev } from '$app/environment';
 export const APP_NAME = 'Open WebUI';
 export const WEBUI_PREFIX = '@a21e259c-1c80-4d6b-928f-89716d576c13@';
 export const WEBUI_BASE_PATH = '/'+WEBUI_PREFIX+'/app';
-export const WEBUI_BASE_URL = (browser ? (dev ? `http://${location.hostname}:8080` : '') : '')+'/'+WEBUI_PREFIX;
 
+export const WEBUI_HOSTNAME = browser ? (dev ? `${location.hostname}:8080` : ``) : '';
+export const WEBUI_BASE_URL = (browser ? (dev ? `http://${WEBUI_HOSTNAME}` : ``) : ``)+'/'+WEBUI_PREFIX;
 export const WEBUI_API_BASE_URL = `${WEBUI_BASE_URL}/api/v1`;
 export const WEBUI_DEFAULT_USER_ICON = '/'+WEBUI_PREFIX+'/user.png';
 
-export const LITELLM_API_BASE_URL = `${WEBUI_BASE_URL}/litellm/api`;
 export const OLLAMA_API_BASE_URL = `${WEBUI_BASE_URL}/ollama`;
-export const OPENAI_API_BASE_URL = `${WEBUI_BASE_URL}/openai/api`;
+export const OPENAI_API_BASE_URL = `${WEBUI_BASE_URL}/openai`;
 export const AUDIO_API_BASE_URL = `${WEBUI_BASE_URL}/audio/api/v1`;
 export const IMAGES_API_BASE_URL = `${WEBUI_BASE_URL}/images/api/v1`;
 export const RAG_API_BASE_URL = `${WEBUI_BASE_URL}/rag/api/v1`;
 
 export const WEBUI_VERSION = APP_VERSION;
+export const WEBUI_BUILD_HASH = APP_BUILD_HASH;
 export const REQUIRED_OLLAMA_VERSION = '0.1.16';
 
 export const SUPPORTED_FILE_TYPE = [
@@ -89,7 +90,10 @@ export const SUPPORTED_FILE_EXTENSIONS = [
 	'csv',
 	'txt',
 	'xls',
-	'xlsx'
+	'xlsx',
+	'pptx',
+	'ppt',
+	'msg'
 ];
 
 // Source: https://kit.svelte.dev/docs/modules#$env-static-public

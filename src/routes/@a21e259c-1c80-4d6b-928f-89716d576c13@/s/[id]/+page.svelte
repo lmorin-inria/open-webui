@@ -5,7 +5,7 @@
 
 	import dayjs from 'dayjs';
 
-	import { modelfiles, settings, chatId, WEBUI_NAME } from '$lib/stores';
+	import { settings, chatId, WEBUI_NAME, models } from '$lib/stores';
 	import { convertMessagesToHistory } from '$lib/utils';
 	import { WEBUI_BASE_PATH } from '$lib/constants';
 
@@ -15,6 +15,7 @@
 	import Navbar from '$lib/components/layout/Navbar.svelte';
 	import { getUserById } from '$lib/apis/users';
 	import { error } from '@sveltejs/kit';
+	import { getModels } from '$lib/apis';
 
 	const i18n = getContext('i18n');
 
@@ -27,17 +28,6 @@
 	// let chatId = $page.params.id;
 	let showModelSelector = false;
 	let selectedModels = [''];
-
-	let selectedModelfiles = {};
-	$: selectedModelfiles = selectedModels.reduce((a, tagName, i, arr) => {
-		const modelfile =
-			$modelfiles.filter((modelfile) => modelfile.tagName === tagName)?.at(0) ?? undefined;
-
-		return {
-			...a,
-			...(modelfile && { [tagName]: modelfile })
-		};
-	}, {});
 
 	let chat = null;
 	let user = null;
@@ -70,10 +60,6 @@
 			if (await loadSharedChat()) {
 				await tick();
 				loaded = true;
-
-				window.setTimeout(() => scrollToBottom(), 0);
-				const chatInput = document.getElementById('chat-textarea');
-				chatInput?.focus();
 			} else {
 				await goto(WEBUI_BASE_PATH+'/');
 			}
@@ -85,6 +71,7 @@
 	//////////////////////////
 
 	const loadSharedChat = async () => {
+		await models.set(await getModels(localStorage.token));
 		await chatId.set($page.params.id);
 		chat = await getChatByShareId(localStorage.token, $chatId).catch(async (error) => {
 			await goto(WEBUI_BASE_PATH+'/');
@@ -112,12 +99,6 @@
 						: convertMessagesToHistory(chatContent.messages);
 				title = chatContent.title;
 
-				let _settings = JSON.parse(localStorage.getItem('settings') ?? '{}');
-				await settings.set({
-					..._settings,
-					system: chatContent.system ?? _settings.system,
-					options: chatContent.options ?? _settings.options
-				});
 				autoScroll = true;
 				await tick();
 
@@ -169,7 +150,6 @@
 							chatId={$chatId}
 							readOnly={true}
 							{selectedModels}
-							{selectedModelfiles}
 							{processing}
 							bind:history
 							bind:messages

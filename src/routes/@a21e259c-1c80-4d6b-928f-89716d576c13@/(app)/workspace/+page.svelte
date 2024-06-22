@@ -4,6 +4,6 @@
 	import { WEBUI_BASE_PATH } from '$lib/constants';
 
 	onMount(() => {
-		goto(WEBUI_BASE_PATH+'/workspace/modelfiles');
+		goto(WEBUI_BASE_PATH+'/workspace/models');
 	});
 </script>

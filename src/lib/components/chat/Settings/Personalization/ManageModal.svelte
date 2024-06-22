@@ -54,7 +54,7 @@
 				class=" flex flex-col w-full sm:flex-row sm:justify-center sm:space-x-6 h-[28rem] max-h-screen outline outline-1 rounded-xl outline-gray-100 dark:outline-gray-800 mb-4 mt-1"
 			>
 				{#if memories.length > 0}
-					<div class="text-left text-sm w-full mb-4 max-h-[22rem] overflow-y-scroll">
+					<div class="text-left text-sm w-full mb-4 overflow-y-scroll">
 						<div class="relative overflow-x-auto">
 							<table class="w-full text-sm text-left text-gray-600 dark:text-gray-400 table-auto">
 								<thead
@@ -136,7 +136,7 @@
 					class=" px-3.5 py-1.5 font-medium hover:bg-black/5 dark:hover:bg-white/5 outline outline-1 outline-gray-300 dark:outline-gray-800 rounded-3xl"
 					on:click={() => {
 						showAddMemoryModal = true;
-					}}>Add memory</button
+					}}>{$i18n.t('Add Memory')}</button
 				>
 				<button
 					class=" px-3.5 py-1.5 font-medium text-red-500 hover:bg-black/5 dark:hover:bg-white/5 outline outline-1 outline-red-300 dark:outline-red-800 rounded-3xl"
@@ -150,7 +150,7 @@
 							toast.success('Memory cleared successfully');
 							memories = [];
 						}
-					}}>Clear memory</button
+					}}>{$i18n.t('Clear memory')}</button
 				>
 			</div>
 		</div>

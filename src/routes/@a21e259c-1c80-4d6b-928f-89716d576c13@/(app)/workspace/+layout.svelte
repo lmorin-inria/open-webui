@@ -15,7 +15,11 @@
 	</title>
 </svelte:head>
 
-<div class=" flex flex-col w-full min-h-screen max-h-screen">
+<div
+	class=" flex flex-col w-full min-h-screen max-h-screen {$showSidebar
+		? 'md:max-w-[calc(100%-260px)]'
+		: ''}"
+>
 	<div class=" px-4 pt-3 mt-0.5 mb-1">
 		<div class=" flex items-center gap-1">
 			<div class="{$showSidebar ? 'md:hidden' : ''} mr-1 self-start flex flex-none items-center">
@@ -40,10 +44,10 @@
 			class="flex scrollbar-none overflow-x-auto w-fit text-center text-sm font-medium rounded-xl bg-transparent/10 p-1"
 		>
 			<a
-				class="min-w-fit rounded-lg p-1.5 px-3 {$page.url.pathname.includes(WEBUI_BASE_PATH+'/workspace/modelfiles')
+				class="min-w-fit rounded-lg p-1.5 px-3 {$page.url.pathname.includes(WEBUI_BASE_PATH+'/workspace/models')
 					? 'bg-gray-50 dark:bg-gray-850'
 					: ''} transition"
-				href="{WEBUI_BASE_PATH}/workspace/modelfiles">{$i18n.t('Modelfiles')}</a
+				href="{WEBUI_BASE_PATH}/workspace/models">{$i18n.t('Models')}</a
 			>
 
 			<a
@@ -60,6 +64,15 @@
 				href="{WEBUI_BASE_PATH}/workspace/documents"
 			>
 				{$i18n.t('Documents')}
+			</a>
+
+			<a
+				class="min-w-fit rounded-lg p-1.5 px-3 {$page.url.pathname.includes(WEBUI_BASE_PATH+'/workspace/tools')
+					? 'bg-gray-50 dark:bg-gray-850'
+					: ''} transition"
+				href="{WEBUI_BASE_PATH}/workspace/tools"
+			>
+				{$i18n.t('Tools')}
 			</a>
 
 			<a
