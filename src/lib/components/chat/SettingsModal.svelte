@@ -5,6 +5,7 @@
 	import { updateUserSettings } from '$lib/apis/users';
 	import { getModels as _getModels } from '$lib/apis';
 	import { goto } from '$app/navigation';
+        import { WEBUI_BASE_PATH } from '$lib/constants';
 
 	import Modal from '../common/Modal.svelte';
 	import Account from './Settings/Account.svelte';
@@ -246,7 +247,7 @@
 							? 'bg-gray-200 dark:bg-gray-800'
 							: ' hover:bg-gray-100 dark:hover:bg-gray-850'}"
 						on:click={async () => {
-							await goto('/admin/settings');
+							await goto(WEBUI_BASE_PATH+'/admin/settings');
 							show = false;
 						}}
 					>

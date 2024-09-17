@@ -80,6 +80,7 @@ if WEBUI_NAME != "Open WebUI":
 WEBUI_URL = os.environ.get("WEBUI_URL", "http://localhost:3000")
 
 WEBUI_FAVICON_URL = "https://openwebui.com/favicon.png"
+WEBUI_DEFAULT_USER_ICON = '/@a21e259c-1c80-4d6b-928f-89716d576c13@/user.png'
 
 
 ####################################

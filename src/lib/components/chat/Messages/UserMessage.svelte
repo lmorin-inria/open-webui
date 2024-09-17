@@ -6,6 +6,7 @@
 	import ProfileImage from './ProfileImage.svelte';
 	import { models, settings } from '$lib/stores';
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
+        import { WEBUI_DEFAULT_USER_ICON } from '$lib/constants';
 
 	import { user as _user } from '$lib/stores';
 	import { getFileContentById } from '$lib/apis/files';
@@ -66,8 +67,8 @@
 	{#if !($settings?.chatBubble ?? true)}
 		<ProfileImage
 			src={message.user
-				? ($models.find((m) => m.id === message.user)?.info?.meta?.profile_image_url ?? '/user.png')
-				: (user?.profile_image_url ?? '/user.png')}
+				? ($models.find((m) => m.id === message.user)?.info?.meta?.profile_image_url ?? WEBUI_DEFAULT_USER_ICON)
+				: (user?.profile_image_url ?? WEBUI_DEFAULT_USER_ICON)}
 		/>
 	{/if}
 	<div class="w-full overflow-hidden pl-1">

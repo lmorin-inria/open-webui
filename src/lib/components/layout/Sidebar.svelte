@@ -32,6 +32,7 @@
 		cloneChatById
 	} from '$lib/apis/chats';
 	import { WEBUI_BASE_URL } from '$lib/constants';
+        import { WEBUI_BASE_PATH } from '$lib/constants';
 
 	import ArchivedChatsModal from './Sidebar/ArchivedChatsModal.svelte';
 	import UserMenu from './Sidebar/UserMenu.svelte';
@@ -201,7 +202,7 @@
 	const saveSettings = async (updated) => {
 		await settings.set({ ...$settings, ...updated });
 		await updateUserSettings(localStorage.token, { ui: $settings });
-		location.href = '/';
+		location.href = WEBUI_BASE_PATH+'/';
 	};
 
 	const deleteChatHandler = async (id) => {
@@ -214,7 +215,7 @@
 			if ($chatId === id) {
 				await chatId.set('');
 				await tick();
-				goto('/');
+				goto(WEBUI_BASE_PATH+'/');
 			}
 
 			allChatsLoaded = false;
@@ -274,11 +275,11 @@
 			<a
 				id="sidebar-new-chat-button"
 				class="flex flex-1 justify-between rounded-xl px-2 h-full hover:bg-gray-100 dark:hover:bg-gray-900 transition"
-				href="/"
+				href="{WEBUI_BASE_PATH}/"
 				draggable="false"
 				on:click={async () => {
 					selectedChatId = null;
-					await goto('/');
+					await goto(WEBUI_BASE_PATH+'/');
 					const newChatButton = document.getElementById('new-chat-button');
 					setTimeout(() => {
 						newChatButton?.click();
@@ -345,7 +346,7 @@
 			<div class="px-2.5 flex justify-center text-gray-800 dark:text-gray-200">
 				<a
 					class="flex-grow flex space-x-3 rounded-xl px-2.5 py-2 hover:bg-gray-100 dark:hover:bg-gray-900 transition"
-					href="/workspace"
+					href="{WEBUI_BASE_PATH}/workspace"
 					on:click={() => {
 						selectedChatId = null;
 						chatId.set('');

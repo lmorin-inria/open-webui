@@ -1,5 +1,6 @@
 <script>
 	import { getContext, createEventDispatcher, onMount } from 'svelte';
+        import { WEBUI_BASE_PATH } from '$lib/constants';
 
 	const i18n = getContext('i18n');
 
@@ -169,7 +170,7 @@ class Tools:
 				<button
 					class="flex space-x-1"
 					on:click={() => {
-						goto('/workspace/tools');
+						goto(WEBUI_BASE_PATH+'/workspace/tools');
 					}}
 					type="button"
 				>

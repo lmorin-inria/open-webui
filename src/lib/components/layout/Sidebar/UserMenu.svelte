@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { DropdownMenu } from 'bits-ui';
 	import { createEventDispatcher, getContext, onMount } from 'svelte';
+        import { WEBUI_BASE_PATH } from '$lib/constants';
 
 	import { flyAndScale } from '$lib/utils/transitions';
 	import { goto } from '$app/navigation';
@@ -84,7 +85,7 @@
 				<button
 					class="flex rounded-md py-2 px-3 w-full hover:bg-gray-50 dark:hover:bg-gray-800 transition"
 					on:click={() => {
-						goto('/playground');
+						goto(WEBUI_BASE_PATH+'/playground');
 						show = false;
 					}}
 				>
@@ -110,7 +111,7 @@
 				<button
 					class="flex rounded-md py-2 px-3 w-full hover:bg-gray-50 dark:hover:bg-gray-800 transition"
 					on:click={() => {
-						goto('/admin');
+						goto(WEBUI_BASE_PATH+'/admin');
 						show = false;
 					}}
 				>
@@ -140,7 +141,7 @@
 				class="flex rounded-md py-2 px-3 w-full hover:bg-gray-50 dark:hover:bg-gray-800 transition"
 				on:click={() => {
 					localStorage.removeItem('token');
-					location.href = '/auth';
+					location.href = WEBUI_BASE_PATH+'/auth';
 					show = false;
 				}}
 			>

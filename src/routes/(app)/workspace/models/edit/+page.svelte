@@ -2,6 +2,7 @@
 	import { v4 as uuidv4 } from 'uuid';
 	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';
+        import { WEBUI_BASE_PATH } from '$lib/constants';
 
 	import { onMount, getContext } from 'svelte';
 	import { page } from '$app/stores';
@@ -47,7 +48,7 @@
 		base_model_id: null,
 		name: '',
 		meta: {
-			profile_image_url: '/static/favicon.png',
+			profile_image_url: WEBUI_BASE_PATH+'/static/favicon.png',
 			description: '',
 			suggestion_prompts: null,
 			tags: []
@@ -118,7 +119,7 @@
 		if (res) {
 			await models.set(await getModels(localStorage.token));
 			toast.success($i18n.t('Model updated successfully'));
-			await goto('/workspace/models');
+			await goto(WEBUI_BASE_PATH+'/workspace/models');
 		}
 
 		loading = false;
@@ -185,10 +186,10 @@
 
 				console.log(model);
 			} else {
-				goto('/workspace/models');
+				goto(WEBUI_BASE_PATH+'/workspace/models');
 			}
 		} else {
-			goto('/workspace/models');
+			goto(WEBUI_BASE_PATH+'/workspace/models');
 		}
 	});
 </script>
@@ -262,7 +263,7 @@
 	<button
 		class="flex space-x-1"
 		on:click={() => {
-			goto('/workspace/models');
+			goto(WEBUI_BASE_PATH+'/workspace/models');
 		}}
 	>
 		<div class=" self-center">

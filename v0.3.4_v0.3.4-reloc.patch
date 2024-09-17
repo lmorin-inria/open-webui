@@ -1,0 +1,1605 @@
+diff --git a/.gitignore b/.gitignore
+index a54fef59..b6055d1c 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -12,6 +12,7 @@ vite.config.ts.timestamp-*
+ __pycache__/
+ *.py[cod]
+ *$py.class
++TAGS
+ 
+ # C extensions
+ *.so
+diff --git a/Dockerfile b/Dockerfile
+index 2bd05e6b..932dbebc 100644
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -25,7 +25,10 @@ WORKDIR /app
+ COPY package.json package-lock.json ./
+ RUN npm ci
+ 
+-COPY . .
++COPY src src
++COPY static static
++COPY scripts/prepare-pyodide.js ./scripts/prepare-pyodide.js
++COPY *.js *.json *.ts .npmrc CHANGELOG.md ./
+ ENV APP_BUILD_HASH=${BUILD_HASH}
+ RUN npm run build
+ 
+@@ -146,6 +149,7 @@ COPY --chown=$UID:$GID --from=build /app/package.json /app/package.json
+ 
+ # copy backend files
+ COPY --chown=$UID:$GID ./backend .
++RUN cp -p /app/build/index.html /app/build/index.html.am
+ 
+ EXPOSE 8080
+ 
+diff --git a/README.md b/README.md
+index 444002fb..39e6f69e 100644
+--- a/README.md
++++ b/README.md
+@@ -11,6 +11,15 @@
+ [![Discord](https://img.shields.io/badge/Discord-Open_WebUI-blue?logo=discord&logoColor=white)](https://discord.gg/5rJgQTnV4s)
+ [![](https://img.shields.io/static/v1?label=Sponsor&message=%E2%9D%A4&logo=GitHub&color=%23fe8e86)](https://github.com/sponsors/tjbck)
+ 
++
++This version of Open WebUI has been modified for only one purpose :
++the deployment of docker/podman instances under a subpath behind a
++proxy. Several hundreds were deployed behind an HaProxy interface
++dispatching LLM requests over a GPU cluster running a Slurm jobs
++Manager at the University of Rennes (RagARennes project). 
++
++Thanks to all the contributors.
++
+ Open WebUI is an [extensible](https://github.com/open-webui/pipelines), feature-rich, and user-friendly self-hosted WebUI designed to operate entirely offline. It supports various LLM runners, including Ollama and OpenAI-compatible APIs. For more information, be sure to check out our [Open WebUI Documentation](https://docs.openwebui.com/).
+ 
+ ![Open WebUI Demo](./demo.gif)
+diff --git a/backend/apps/socket/main.py b/backend/apps/socket/main.py
+index 123ff31c..726ef828 100644
+--- a/backend/apps/socket/main.py
++++ b/backend/apps/socket/main.py
+@@ -1,12 +1,12 @@
+ import socketio
+ import asyncio
+ 
+-
++from config import FRONTEND_APP_ROOT
+ from apps.webui.models.users import Users
+ from utils.utils import decode_token
+ 
+ sio = socketio.AsyncServer(cors_allowed_origins=[], async_mode="asgi")
+-app = socketio.ASGIApp(sio, socketio_path="/ws/socket.io")
++app = socketio.ASGIApp(sio, socketio_path=FRONTEND_APP_ROOT + "/ws/socket.io")
+ 
+ # Dictionary to maintain the user pool
+ 
+diff --git a/backend/config.py b/backend/config.py
+index 30a23f29..116e56b1 100644
+--- a/backend/config.py
++++ b/backend/config.py
+@@ -179,6 +179,7 @@ WEBUI_BUILD_HASH = os.environ.get("WEBUI_BUILD_HASH", "dev-build")
+ 
+ DATA_DIR = Path(os.getenv("DATA_DIR", BACKEND_DIR / "data")).resolve()
+ FRONTEND_BUILD_DIR = Path(os.getenv("FRONTEND_BUILD_DIR", BASE_DIR / "build")).resolve()
++FRONTEND_APP_ROOT = str(Path(os.getenv("FRONTEND_APP_ROOT", "/@a21e259c-1c80-4d6b-928f-89716d576c13@")))
+ 
+ RESET_CONFIG_ON_START = (
+     os.environ.get("RESET_CONFIG_ON_START", "False").lower() == "true"
+diff --git a/backend/main.py b/backend/main.py
+index 04b4ebff..8bb7c2c8 100644
+--- a/backend/main.py
++++ b/backend/main.py
+@@ -76,6 +76,7 @@ from config import (
+     VERSION,
+     CHANGELOG,
+     FRONTEND_BUILD_DIR,
++    FRONTEND_APP_ROOT,
+     CACHE_DIR,
+     STATIC_DIR,
+     ENABLE_OPENAI_API,
+@@ -129,13 +130,13 @@ https://github.com/open-webui/open-webui
+ """
+ )
+ 
+-
+ @asynccontextmanager
+ async def lifespan(app: FastAPI):
+     yield
+ 
+ 
+ app = FastAPI(
++    root_path=FRONTEND_APP_ROOT,
+     docs_url="/docs" if ENV == "dev" else None, redoc_url=None, lifespan=lifespan
+ )
+ 
+diff --git a/backend/start.sh b/backend/start.sh
+index 16a004e4..5017028f 100755
+--- a/backend/start.sh
++++ b/backend/start.sh
+@@ -1,6 +1,25 @@
+ #!/usr/bin/env bash
+ 
+ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
++
++KEEP_ORIGINAL_APP="${KEEP_ORIGINAL_APP:-false}"
++ROOT_PATH=${ROOT_PATH:-_app}
++MARK=@a21e259c-1c80-4d6b-928f-89716d576c13@
++cd "$SCRIPT_DIR"/../build || exit 1
++
++if ! [ -d ${ROOT_PATH} ]; then # Create a relocated copy of the frontend based on the mark
++    if ${KEEP_ORIGINAL_APP}; then
++        mkdir -p ${ROOT_PATH}
++        cp -rp ${MARK}/app ${ROOT_PATH}/app
++    else
++        mv ${MARK} ${ROOT_PATH}
++    fi
++    ln -s ${ROOT_PATH}/app
++    find ${ROOT_PATH}/app/immutable/entry -type f -exec sed -i "s~${MARK}~${ROOT_PATH}/app~g"   '{}' \;
++    find ${ROOT_PATH}/ -type f -exec sed -i "s~${MARK}~${ROOT_PATH}~g"   '{}' \;
++    sed "s~${MARK}~${ROOT_PATH}~g" index.html.am > index.html
++fi
++
+ cd "$SCRIPT_DIR" || exit
+ 
+ KEY_FILE=.webui_secret_key
+@@ -30,7 +49,6 @@ if [[ "${USE_CUDA_DOCKER,,}" == "true" ]]; then
+   export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/lib/python3.11/site-packages/torch/lib:/usr/local/lib/python3.11/site-packages/nvidia/cudnn/lib"
+ fi
+ 
+-
+ # Check if SPACE_ID is set, if so, configure for space
+ if [ -n "$SPACE_ID" ]; then
+   echo "Configuring for HuggingFace Space deployment"
+@@ -55,4 +73,4 @@ if [ -n "$SPACE_ID" ]; then
+   export WEBUI_URL=${SPACE_HOST}
+ fi
+ 
+-WEBUI_SECRET_KEY="$WEBUI_SECRET_KEY" exec uvicorn main:app --host "$HOST" --port "$PORT" --forwarded-allow-ips '*'
++WEBUI_SECRET_KEY="$WEBUI_SECRET_KEY" FRONTEND_APP_ROOT=/${ROOT_PATH} exec uvicorn main:app --host "$HOST" --port "$PORT" --forwarded-allow-ips '*'
+diff --git a/src/app.css b/src/app.css
+index da1d961e..0612cae2 100644
+--- a/src/app.css
++++ b/src/app.css
+@@ -1,12 +1,12 @@
+ @font-face {
+ 	font-family: 'Arimo';
+-	src: url('/assets/fonts/Arimo-Variable.ttf');
++	src: url('/@a21e259c-1c80-4d6b-928f-89716d576c13@/assets/fonts/Arimo-Variable.ttf');
+ 	font-display: swap;
+ }
+ 
+ @font-face {
+ 	font-family: 'Mona Sans';
+-	src: url('/assets/fonts/Mona-Sans.woff2');
++	src: url('/@a21e259c-1c80-4d6b-928f-89716d576c13@/assets/fonts/Mona-Sans.woff2');
+ 	font-display: swap;
+ }
+ 
+diff --git a/src/app.html b/src/app.html
+index a79343df..95c057e6 100644
+--- a/src/app.html
++++ b/src/app.html
+@@ -2,15 +2,15 @@
+ <html lang="en">
+ 	<head>
+ 		<meta charset="utf-8" />
+-		<link rel="icon" href="%sveltekit.assets%/favicon.png" />
+-		<link rel="manifest" href="%sveltekit.assets%/manifest.json" crossorigin="use-credentials" />
++		<link rel="icon" href="/@a21e259c-1c80-4d6b-928f-89716d576c13@/favicon.png" />
++		<link rel="manifest" href="/@a21e259c-1c80-4d6b-928f-89716d576c13@/manifest.json" crossorigin="use-credentials" />
+ 		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+ 		<meta name="robots" content="noindex,nofollow" />
+ 		<link
+ 			rel="search"
+ 			type="application/opensearchdescription+xml"
+ 			title="Open WebUI"
+-			href="/opensearch.xml"
++			href="/@a21e259c-1c80-4d6b-928f-89716d576c13@/opensearch.xml"
+ 		/>
+ 
+ 		<script>
+@@ -70,7 +70,7 @@
+ 				}
+ 			</style>
+ 
+-			<img
++			<a href="/@a21e259c-1c80-4d6b-928f-89716d576c13@/app"> <img
+ 				id="logo"
+ 				style="
+ 					position: absolute;
+@@ -80,8 +80,8 @@
+ 					left: 50%;
+ 					margin-left: -3rem;
+ 				"
+-				src="/logo.svg"
+-			/>
++				src="/@a21e259c-1c80-4d6b-928f-89716d576c13@/logo.svg"
++			/></a>
+ 
+ 			<div
+ 				style="
+@@ -100,7 +100,7 @@
+ 				<img
+ 					id="logo-her"
+ 					style="width: 13rem; height: 13rem"
+-					src="/logo.svg"
++					src="/@a21e259c-1c80-4d6b-928f-89716d576c13@/logo.svg"
+ 					class="animate-pulse-fast"
+ 				/>
+ 
+diff --git a/src/lib/components/admin/UserChatsModal.svelte b/src/lib/components/admin/UserChatsModal.svelte
+index 67fa367c..45d9c64f 100644
+--- a/src/lib/components/admin/UserChatsModal.svelte
++++ b/src/lib/components/admin/UserChatsModal.svelte
+@@ -2,6 +2,7 @@
+ 	import { toast } from 'svelte-sonner';
+ 	import dayjs from 'dayjs';
+ 	import { getContext, createEventDispatcher } from 'svelte';
++	import { WEBUI_BASE_PATH } from '$lib/constants';
+ 
+ 	const dispatch = createEventDispatcher();
+ 
+@@ -81,7 +82,7 @@
+ 												'border-b'} dark:bg-gray-900 dark:border-gray-850 text-xs"
+ 										>
+ 											<td class="px-3 py-1 w-2/3">
+-												<a href="/s/{chat.id}" target="_blank">
++												<a href="{WEBUI_BASE_PATH+'/s/'+chat.id}" target="_blank">
+ 													<div class=" underline line-clamp-1">
+ 														{chat.title}
+ 													</div>
+diff --git a/src/lib/components/chat/Chat.svelte b/src/lib/components/chat/Chat.svelte
+index 359056cf..ad75a607 100644
+--- a/src/lib/components/chat/Chat.svelte
++++ b/src/lib/components/chat/Chat.svelte
+@@ -9,7 +9,7 @@
+ 
+ 	import type { Writable } from 'svelte/store';
+ 	import type { i18n as i18nType } from 'i18next';
+-	import { OLLAMA_API_BASE_URL, OPENAI_API_BASE_URL, WEBUI_BASE_URL } from '$lib/constants';
++	import { OLLAMA_API_BASE_URL, OPENAI_API_BASE_URL, WEBUI_BASE_URL, WEBUI_BASE_PATH } from '$lib/constants';
+ 
+ 	import {
+ 		chatId,
+@@ -116,7 +116,7 @@
+ 				const chatInput = document.getElementById('chat-textarea');
+ 				chatInput?.focus();
+ 			} else {
+-				await goto('/');
++				await goto(WEBUI_BASE_PATH+'/');
+ 			}
+ 		})();
+ 	}
+@@ -126,7 +126,7 @@
+ 			await initNewChat();
+ 		} else {
+ 			if (!($settings.saveChatHistory ?? true)) {
+-				await goto('/');
++				await goto(WEBUI_BASE_PATH+'/');
+ 			}
+ 		}
+ 	});
+@@ -136,7 +136,7 @@
+ 	//////////////////////////
+ 
+ 	const initNewChat = async () => {
+-		window.history.replaceState(history.state, '', `/`);
++		window.history.replaceState(history.state, '', WEBUI_BASE_PATH+'/');
+ 		await chatId.set('');
+ 
+ 		autoScroll = true;
+@@ -187,7 +187,7 @@
+ 	const loadChat = async () => {
+ 		chatId.set(chatIdProp);
+ 		chat = await getChatById(localStorage.token, $chatId).catch(async (error) => {
+-			await goto('/');
++			await goto(WEBUI_BASE_PATH+'/');
+ 			return null;
+ 		});
+ 
+@@ -852,7 +852,7 @@
+ 		}
+ 
+ 		if (messages.length == 2 && messages.at(1).content !== '') {
+-			window.history.replaceState(history.state, '', `/c/${_chatId}`);
++			window.history.replaceState(history.state, '', `{WEBUI_BASE_PATH}/c/${_chatId}`);
+ 			const _title = await generateChatTitle(userPrompt);
+ 			await setChatTitle(_chatId, _title);
+ 		}
+@@ -1062,7 +1062,7 @@
+ 		}
+ 
+ 		if (messages.length == 2) {
+-			window.history.replaceState(history.state, '', `/c/${_chatId}`);
++			window.history.replaceState(history.state, '', `{WEBUI_BASE_PATH}/c/${_chatId}`);
+ 
+ 			const _title = await generateChatTitle(userPrompt);
+ 			await setChatTitle(_chatId, _title);
+diff --git a/src/lib/components/chat/Messages/ProfileImage.svelte b/src/lib/components/chat/Messages/ProfileImage.svelte
+index 44f3b5fc..738d8158 100644
+--- a/src/lib/components/chat/Messages/ProfileImage.svelte
++++ b/src/lib/components/chat/Messages/ProfileImage.svelte
+@@ -1,8 +1,8 @@
+ <script lang="ts">
+ 	import { settings } from '$lib/stores';
+-	import { WEBUI_BASE_URL } from '$lib/constants';
++	import { WEBUI_BASE_URL, WEBUI_DEFAULT_USER_ICON } from '$lib/constants';
+ 
+-	export let src = '/user.png';
++	export let src = WEBUI_DEFAULT_USER_ICON;
+ </script>
+ 
+ <div class={($settings?.chatDirection ?? 'LTR') === 'LTR' ? 'mr-3' : 'ml-3'}>
+@@ -11,7 +11,7 @@
+ 		src={src.startsWith(WEBUI_BASE_URL) ||
+ 		src.startsWith('https://www.gravatar.com/avatar/') ||
+ 		src.startsWith('data:') ||
+-		src.startsWith('/')
++		src.startsWith('@a21e259c-1c80-4d6b-928f-89716d576c13@/')
+ 			? src
+ 			: `/user.png`}
+ 		class=" w-8 object-cover rounded-full"
+diff --git a/src/lib/components/chat/Messages/UserMessage.svelte b/src/lib/components/chat/Messages/UserMessage.svelte
+index 04591a14..7134996e 100644
+--- a/src/lib/components/chat/Messages/UserMessage.svelte
++++ b/src/lib/components/chat/Messages/UserMessage.svelte
+@@ -6,6 +6,7 @@
+ 	import ProfileImage from './ProfileImage.svelte';
+ 	import { models, settings } from '$lib/stores';
+ 	import Tooltip from '$lib/components/common/Tooltip.svelte';
++        import { WEBUI_DEFAULT_USER_ICON } from '$lib/constants';
+ 
+ 	import { user as _user } from '$lib/stores';
+ 
+@@ -60,8 +61,8 @@
+ 	{#if !($settings?.chatBubble ?? true)}
+ 		<ProfileImage
+ 			src={message.user
+-				? $models.find((m) => m.id === message.user)?.info?.meta?.profile_image_url ?? '/user.png'
+-				: user?.profile_image_url ?? '/user.png'}
++				? $models.find((m) => m.id === message.user)?.info?.meta?.profile_image_url ?? WEBUI_DEFAULT_USER_ICON
++				: user?.profile_image_url ?? WEBUI_DEFAULT_USER_ICON}
+ 		/>
+ 	{/if}
+ 	<div class="w-full overflow-hidden pl-1">
+diff --git a/src/lib/components/chat/Settings/Account.svelte b/src/lib/components/chat/Settings/Account.svelte
+index 1ed5beac..2f5bbceb 100644
+--- a/src/lib/components/chat/Settings/Account.svelte
++++ b/src/lib/components/chat/Settings/Account.svelte
+@@ -4,6 +4,7 @@
+ 
+ 	import { user } from '$lib/stores';
+ 	import { updateUserProfile, createAPIKey, getAPIKey } from '$lib/apis/auths';
++        import { WEBUI_DEFAULT_USER_ICON } from '$lib/constants';
+ 
+ 	import UpdatePassword from './Account/UpdatePassword.svelte';
+ 	import { getGravatarUrl } from '$lib/apis/utils';
+@@ -207,7 +208,7 @@
+ 						<button
+ 							class=" text-xs text-center text-gray-800 dark:text-gray-400 rounded-lg px-2 py-1"
+ 							on:click={async () => {
+-								profileImageUrl = '/user.png';
++								profileImageUrl = WEBUI_DEFAULT_USER_ICON;
+ 							}}>{$i18n.t('Remove')}</button
+ 						>
+ 					</div>
+diff --git a/src/lib/components/chat/Settings/Chats.svelte b/src/lib/components/chat/Settings/Chats.svelte
+index c0b9238e..29bd0642 100644
+--- a/src/lib/components/chat/Settings/Chats.svelte
++++ b/src/lib/components/chat/Settings/Chats.svelte
+@@ -3,6 +3,7 @@
+ 	const { saveAs } = fileSaver;
+ 
+ 	import { chats, user, settings } from '$lib/stores';
++	import { WEBUI_BASE_PATH } from '$lib/constants';
+ 
+ 	import {
+ 		archiveAllChats,
+@@ -73,7 +74,7 @@
+ 	};
+ 
+ 	const archiveAllChatsHandler = async () => {
+-		await goto('/');
++		await goto(WEBUI_BASE_PATH+'/');
+ 		await archiveAllChats(localStorage.token).catch((error) => {
+ 			toast.error(error);
+ 		});
+@@ -81,7 +82,7 @@
+ 	};
+ 
+ 	const deleteAllChatsHandler = async () => {
+-		await goto('/');
++		await goto(WEBUI_BASE_PATH+'/');
+ 		await deleteAllChats(localStorage.token).catch((error) => {
+ 			toast.error(error);
+ 		});
+@@ -93,7 +94,7 @@
+ 		console.log(saveChatHistory);
+ 
+ 		if (saveChatHistory === false) {
+-			await goto('/');
++			await goto(WEBUI_BASE_PATH+'/');
+ 		}
+ 		saveSettings({ saveChatHistory: saveChatHistory });
+ 	};
+diff --git a/src/lib/components/chat/SettingsModal.svelte b/src/lib/components/chat/SettingsModal.svelte
+index d6b3a21e..a6e1af1e 100644
+--- a/src/lib/components/chat/SettingsModal.svelte
++++ b/src/lib/components/chat/SettingsModal.svelte
+@@ -16,6 +16,7 @@
+ 	import Personalization from './Settings/Personalization.svelte';
+ 	import { updateUserSettings } from '$lib/apis/users';
+ 	import { goto } from '$app/navigation';
++	import { WEBUI_BASE_PATH } from '$lib/constants';
+ 
+ 	const i18n = getContext('i18n');
+ 
+@@ -95,7 +96,7 @@
+ 							? 'bg-gray-200 dark:bg-gray-700'
+ 							: ' hover:bg-gray-300 dark:hover:bg-gray-800'}"
+ 						on:click={async () => {
+-							await goto('/admin/settings');
++							await goto(WEBUI_BASE_PATH+'/admin/settings');
+ 							show = false;
+ 						}}
+ 					>
+diff --git a/src/lib/components/chat/ShareChatModal.svelte b/src/lib/components/chat/ShareChatModal.svelte
+index e6ccc132..87be53ad 100644
+--- a/src/lib/components/chat/ShareChatModal.svelte
++++ b/src/lib/components/chat/ShareChatModal.svelte
+@@ -5,6 +5,7 @@
+ 	import { toast } from 'svelte-sonner';
+ 	import { deleteSharedChatById, getChatById, shareChatById } from '$lib/apis/chats';
+ 	import { copyToClipboard } from '$lib/utils';
++	import { WEBUI_BASE_PATH } from '$lib/constants';
+ 
+ 	import Modal from '../common/Modal.svelte';
+ 	import Link from '../icons/Link.svelte';
+@@ -107,7 +108,7 @@
+ 			<div class="px-5 pt-4 pb-5 w-full flex flex-col justify-center">
+ 				<div class=" text-sm dark:text-gray-300 mb-1">
+ 					{#if chat.share_id}
+-						<a href="/s/{chat.share_id}" target="_blank"
++						<a href="{WEBUI_BASE_PATH+'/s/'+chat.share_id}" target="_blank"
+ 							>{$i18n.t('You have shared this chat')}
+ 							<span class=" underline">{$i18n.t('before')}</span>.</a
+ 						>
+diff --git a/src/lib/components/common/Banner.svelte b/src/lib/components/common/Banner.svelte
+index 6b5a4b75..07ba25d2 100644
+--- a/src/lib/components/common/Banner.svelte
++++ b/src/lib/components/common/Banner.svelte
+@@ -2,6 +2,7 @@
+ 	import type { Banner } from '$lib/types';
+ 	import { onMount, createEventDispatcher } from 'svelte';
+ 	import { fade } from 'svelte/transition';
++	import { WEBUI_BASE_PATH } from '$lib/constants';
+ 
+ 	const dispatch = createEventDispatcher();
+ 
+@@ -55,7 +56,7 @@
+ 						<div class="flex md:hidden group w-fit md:items-center">
+ 							<a
+ 								class="text-gray-700 dark:text-white text-xs font-bold underline"
+-								href="/assets/files/whitepaper.pdf"
++								href="{WEBUI_BASE_PATH}/assets/files/whitepaper.pdf"
+ 								target="_blank">Learn More</a
+ 							>
+ 
+@@ -89,7 +90,7 @@
+ 				<div class="hidden md:flex group w-fit md:items-center">
+ 					<a
+ 						class="text-gray-700 dark:text-white text-xs font-bold underline"
+-						href="/"
++						href="{WEBUI_BASE_PATH}/"
+ 						target="_blank">Learn More</a
+ 					>
+ 
+diff --git a/src/lib/components/common/Image.svelte b/src/lib/components/common/Image.svelte
+index dc65df87..538ec5fd 100644
+--- a/src/lib/components/common/Image.svelte
++++ b/src/lib/components/common/Image.svelte
+@@ -1,5 +1,5 @@
+ <script lang="ts">
+-	import { WEBUI_BASE_URL } from '$lib/constants';
++	import { WEBUI_BASE_URL, WEBUI_BASE_PATH } from '$lib/constants';
+ 	import ImagePreview from './ImagePreview.svelte';
+ 
+ 	export let src = '';
+@@ -7,7 +7,7 @@
+ 
+ 	let _src = '';
+ 
+-	$: _src = src.startsWith('/') ? `${WEBUI_BASE_URL}${src}` : src;
++	$: _src = src.startsWith(WEBUI_BASE_PATH+'/') ? `${WEBUI_BASE_URL}${src}` : src;
+ 
+ 	let showImagePreview = false;
+ </script>
+diff --git a/src/lib/components/layout/Overlay/AccountPending.svelte b/src/lib/components/layout/Overlay/AccountPending.svelte
+index c272963e..98ea6913 100644
+--- a/src/lib/components/layout/Overlay/AccountPending.svelte
++++ b/src/lib/components/layout/Overlay/AccountPending.svelte
+@@ -1,6 +1,7 @@
+ <script lang="ts">
+ 	import { getAdminDetails } from '$lib/apis/auths';
+ 	import { onMount, tick, getContext } from 'svelte';
++	import { WEBUI_BASE_PATH } from '$lib/constants';
+ 
+ 	const i18n = getContext('i18n');
+ 
+@@ -42,7 +43,7 @@
+ 					<button
+ 						class="relative z-20 flex px-5 py-2 rounded-full bg-white border border-gray-100 dark:border-none hover:bg-gray-100 text-gray-700 transition font-medium text-sm"
+ 						on:click={async () => {
+-							location.href = '/';
++							location.href = WEBUI_BASE_PATH+'/';
+ 						}}
+ 					>
+ 						{$i18n.t('Check Again')}
+@@ -52,7 +53,7 @@
+ 						class="text-xs text-center w-full mt-2 text-gray-400 underline"
+ 						on:click={async () => {
+ 							localStorage.removeItem('token');
+-							location.href = '/auth';
++							location.href = WEBUI_BASE_PATH+'/auth';
+ 						}}>{$i18n.t('Sign Out')}</button
+ 					>
+ 				</div>
+diff --git a/src/lib/components/layout/Sidebar.svelte b/src/lib/components/layout/Sidebar.svelte
+index 9bd4f0e1..3d2de2fd 100644
+--- a/src/lib/components/layout/Sidebar.svelte
++++ b/src/lib/components/layout/Sidebar.svelte
+@@ -27,7 +27,7 @@
+ 	} from '$lib/apis/chats';
+ 	import { toast } from 'svelte-sonner';
+ 	import { fade, slide } from 'svelte/transition';
+-	import { WEBUI_BASE_URL } from '$lib/constants';
++	import { WEBUI_BASE_URL, WEBUI_BASE_PATH } from '$lib/constants';
+ 	import Tooltip from '../common/Tooltip.svelte';
+ 	import ChatMenu from './Sidebar/ChatMenu.svelte';
+ 	import ShareChatModal from '../chat/ShareChatModal.svelte';
+@@ -150,7 +150,7 @@
+ 	};
+ 
+ 	const loadChat = async (id) => {
+-		goto(`/c/${id}`);
++		goto(`${WEBUI_BASE_PATH}/c/${id}`);
+ 	};
+ 
+ 	const editChatTitle = async (id, _title) => {
+@@ -176,7 +176,7 @@
+ 
+ 		if (res) {
+ 			if ($chatId === id) {
+-				goto('/');
++				goto(WEBUI_BASE_PATH+'/');
+ 			}
+ 
+ 			await chats.set(await getChatList(localStorage.token));
+@@ -190,7 +190,7 @@
+ 		});
+ 
+ 		if (res) {
+-			goto(`/c/${res.id}`);
++			goto(`{WEBUI_BASE_PATH}/c/${res.id}`);
+ 			await chats.set(await getChatList(localStorage.token));
+ 		}
+ 	};
+@@ -198,7 +198,7 @@
+ 	const saveSettings = async (updated) => {
+ 		await settings.set({ ...$settings, ...updated });
+ 		await updateUserSettings(localStorage.token, { ui: $settings });
+-		location.href = '/';
++		location.href = WEBUI_BASE_PATH+'/';
+ 	};
+ 
+ 	const archiveChatHandler = async (id) => {
+@@ -248,12 +248,12 @@
+ 			<a
+ 				id="sidebar-new-chat-button"
+ 				class="flex flex-1 justify-between rounded-xl px-2 py-2 hover:bg-gray-100 dark:hover:bg-gray-850 transition"
+-				href="/"
++				href="{WEBUI_BASE_PATH+'/'}"
+ 				draggable="false"
+ 				on:click={async () => {
+ 					selectedChatId = null;
+ 
+-					await goto('/');
++					await goto(WEBUI_BASE_PATH+'/');
+ 					const newChatButton = document.getElementById('new-chat-button');
+ 					setTimeout(() => {
+ 						newChatButton?.click();
+@@ -321,7 +321,7 @@
+ 			<div class="px-2.5 flex justify-center text-gray-800 dark:text-gray-200">
+ 				<a
+ 					class="flex-grow flex space-x-3 rounded-xl px-2.5 py-2 hover:bg-gray-100 dark:hover:bg-gray-900 transition"
+-					href="/workspace"
++					href="{WEBUI_BASE_PATH+'/workspace'}"
+ 					on:click={() => {
+ 						selectedChatId = null;
+ 						chatId.set('');
+@@ -512,7 +512,7 @@
+ 									: chat.id === selectedChatId
+ 									? 'bg-gray-100 dark:bg-gray-950'
+ 									: ' group-hover:bg-gray-100 dark:group-hover:bg-gray-950'}  whitespace-nowrap text-ellipsis"
+-								href="/c/{chat.id}"
++								href="{WEBUI_BASE_PATH+'/c/'+chat.id}"
+ 								on:click={() => {
+ 									selectedChatId = chat.id;
+ 									if ($mobile) {
+diff --git a/src/lib/components/layout/Sidebar/ArchivedChatsModal.svelte b/src/lib/components/layout/Sidebar/ArchivedChatsModal.svelte
+index 80e3f157..a0667015 100644
+--- a/src/lib/components/layout/Sidebar/ArchivedChatsModal.svelte
++++ b/src/lib/components/layout/Sidebar/ArchivedChatsModal.svelte
+@@ -7,6 +7,7 @@
+ 
+ 	const dispatch = createEventDispatcher();
+ 
++	import { WEBUI_BASE_PATH } from '$lib/constants';
+ 	import Modal from '$lib/components/common/Modal.svelte';
+ 	import {
+ 		archiveChatById,
+@@ -131,7 +132,7 @@
+ 													'border-b'} dark:bg-gray-900 dark:border-gray-850 text-xs"
+ 											>
+ 												<td class="px-3 py-1 w-2/3">
+-													<a href="/c/{chat.id}" target="_blank">
++													<a href="{WEBUI_BASE_PATH+'/c/'+chat.id}" target="_blank">
+ 														<div class=" underline line-clamp-1">
+ 															{chat.title}
+ 														</div>
+diff --git a/src/lib/components/layout/Sidebar/UserMenu.svelte b/src/lib/components/layout/Sidebar/UserMenu.svelte
+index d361a3d5..deb53b9d 100644
+--- a/src/lib/components/layout/Sidebar/UserMenu.svelte
++++ b/src/lib/components/layout/Sidebar/UserMenu.svelte
+@@ -7,6 +7,7 @@
+ 	import ArchiveBox from '$lib/components/icons/ArchiveBox.svelte';
+ 	import { showSettings, activeUserCount, USAGE_POOL } from '$lib/stores';
+ 	import { fade, slide } from 'svelte/transition';
++	import { WEBUI_BASE_PATH } from '$lib/constants';
+ 	import Tooltip from '$lib/components/common/Tooltip.svelte';
+ 
+ 	const i18n = getContext('i18n');
+@@ -84,7 +85,7 @@
+ 				<button
+ 					class="flex rounded-md py-2 px-3 w-full hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+ 					on:click={() => {
+-						goto('/admin');
++						goto(WEBUI_BASE_PATH+'/admin');
+ 						show = false;
+ 					}}
+ 				>
+@@ -114,7 +115,7 @@
+ 				class="flex rounded-md py-2 px-3 w-full hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+ 				on:click={() => {
+ 					localStorage.removeItem('token');
+-					location.href = '/auth';
++					location.href = WEBUI_BASE_PATH+'/auth';
+ 					show = false;
+ 				}}
+ 			>
+diff --git a/src/lib/components/workspace/Models.svelte b/src/lib/components/workspace/Models.svelte
+index aa86bc3b..652703e5 100644
+--- a/src/lib/components/workspace/Models.svelte
++++ b/src/lib/components/workspace/Models.svelte
+@@ -9,6 +9,7 @@
+ 
+ 	import { WEBUI_NAME, mobile, models, settings, user } from '$lib/stores';
+ 	import { addNewModel, deleteModelById, getModelInfos, updateModelById } from '$lib/apis/models';
++	import { WEBUI_BASE_PATH, WEBUI_PREFIX } from '$lib/constants';
+ 
+ 	import { deleteModel } from '$lib/apis/ollama';
+ 	import { goto } from '$app/navigation';
+@@ -227,7 +228,7 @@
+ 	<div>
+ 		<a
+ 			class=" px-2 py-2 rounded-xl border border-gray-200 dark:border-gray-600 dark:border-0 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 transition font-medium text-sm flex items-center space-x-1"
+-			href="/workspace/models/create"
++			href="{WEBUI_BASE_PATH}/workspace/models/create"
+ 		>
+ 			<svg
+ 				xmlns="http://www.w3.org/2000/svg"
+@@ -244,7 +245,7 @@
+ </div>
+ <hr class=" dark:border-gray-850 my-2.5" />
+ 
+-<a class=" flex space-x-4 cursor-pointer w-full mb-2 px-3 py-2" href="/workspace/models/create">
++<a class=" flex space-x-4 cursor-pointer w-full mb-2 px-3 py-2" href="{WEBUI_BASE_PATH}/workspace/models/create">
+ 	<div class=" self-center w-10">
+ 		<div
+ 			class="w-full h-10 flex justify-center rounded-full bg-transparent dark:bg-gray-700 border border-dashed border-gray-200"
+@@ -277,7 +278,7 @@
+ 		>
+ 			<a
+ 				class=" flex flex-1 space-x-3.5 cursor-pointer w-full"
+-				href={`/?models=${encodeURIComponent(model.id)}`}
++				href={`WEBUI_BASE_PATH+/?models=${encodeURIComponent(model.id)}`}
+ 			>
+ 				<div class=" self-start w-8 pt-0.5">
+ 					<div
+@@ -286,7 +287,7 @@
+ 							: ''} "
+ 					>
+ 						<img
+-							src={model?.info?.meta?.profile_image_url ?? '/favicon.png'}
++							src={model?.info?.meta?.profile_image_url ?? '/'+WEBUI_PREFIX+'/favicon.png'}
+ 							alt="modelfile profile"
+ 							class=" rounded-full w-full h-auto object-cover"
+ 						/>
+@@ -306,7 +307,7 @@
+ 				<a
+ 					class="self-center w-fit text-sm px-2 py-2 dark:text-gray-300 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-xl"
+ 					type="button"
+-					href={`/workspace/models/edit?id=${encodeURIComponent(model.id)}`}
++					href={`WEBUI_BASE_PATH+/workspace/models/edit?id=${encodeURIComponent(model.id)}`}
+ 				>
+ 					<svg
+ 						xmlns="http://www.w3.org/2000/svg"
+diff --git a/src/lib/components/workspace/Playground.svelte b/src/lib/components/workspace/Playground.svelte
+index e99014ca..18c34688 100644
+--- a/src/lib/components/workspace/Playground.svelte
++++ b/src/lib/components/workspace/Playground.svelte
+@@ -5,7 +5,7 @@
+ 
+ 	import { toast } from 'svelte-sonner';
+ 
+-	import { OLLAMA_API_BASE_URL, OPENAI_API_BASE_URL, WEBUI_API_BASE_URL } from '$lib/constants';
++	import { OLLAMA_API_BASE_URL, OPENAI_API_BASE_URL, WEBUI_BASE_PATH, WEBUI_API_BASE_URL } from '$lib/constants';
+ 	import { WEBUI_NAME, config, user, models, settings } from '$lib/stores';
+ 
+ 	import { generateChatCompletion } from '$lib/apis/ollama';
+@@ -213,7 +213,7 @@
+ 
+ 	onMount(async () => {
+ 		if ($user?.role !== 'admin') {
+-			await goto('/');
++			await goto(WEBUI_BASE_PATH+'/');
+ 		}
+ 
+ 		if ($settings?.models) {
+diff --git a/src/lib/components/workspace/Prompts.svelte b/src/lib/components/workspace/Prompts.svelte
+index 65c8442e..3694e276 100644
+--- a/src/lib/components/workspace/Prompts.svelte
++++ b/src/lib/components/workspace/Prompts.svelte
+@@ -5,6 +5,7 @@
+ 
+ 	import { onMount, getContext } from 'svelte';
+ 	import { WEBUI_NAME, prompts } from '$lib/stores';
++	import { WEBUI_BASE_PATH } from '$lib/constants';
+ 	import { createNewPrompt, deletePromptByCommand, getPrompts } from '$lib/apis/prompts';
+ 	import { error } from '@sveltejs/kit';
+ 	import { goto } from '$app/navigation';
+@@ -74,7 +75,7 @@
+ 	<div>
+ 		<a
+ 			class=" px-2 py-2 rounded-xl border border-gray-200 dark:border-gray-600 dark:border-0 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 transition font-medium text-sm flex items-center space-x-1"
+-			href="/workspace/prompts/create"
++			href="{WEBUI_BASE_PATH}/workspace/prompts/create"
+ 		>
+ 			<svg
+ 				xmlns="http://www.w3.org/2000/svg"
+@@ -97,7 +98,7 @@
+ 			class=" flex space-x-4 cursor-pointer w-full px-3 py-2 dark:hover:bg-white/5 hover:bg-black/5 rounded-xl"
+ 		>
+ 			<div class=" flex flex-1 space-x-4 cursor-pointer w-full">
+-				<a href={`/workspace/prompts/edit?command=${encodeURIComponent(prompt.command)}`}>
++				<a href={WEBUI_BASE_PATH+`/workspace/prompts/edit?command=${encodeURIComponent(prompt.command)}`}>
+ 					<div class=" flex-1 self-center pl-5">
+ 						<div class=" font-bold">{prompt.command}</div>
+ 						<div class=" text-xs overflow-hidden text-ellipsis line-clamp-1">
+@@ -110,7 +111,7 @@
+ 				<a
+ 					class="self-center w-fit text-sm px-2 py-2 dark:text-gray-300 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-xl"
+ 					type="button"
+-					href={`/workspace/prompts/edit?command=${encodeURIComponent(prompt.command)}`}
++					href={WEBUI_BASE_PATH+`/workspace/prompts/edit?command=${encodeURIComponent(prompt.command)}`}
+ 				>
+ 					<svg
+ 						xmlns="http://www.w3.org/2000/svg"
+@@ -134,7 +135,7 @@
+ 					on:click={() => {
+ 						// console.log(modelfile);
+ 						sessionStorage.prompt = JSON.stringify(prompt);
+-						goto('/workspace/prompts/create');
++						goto(WEBUI_BASE_PATH+'/workspace/prompts/create');
+ 					}}
+ 				>
+ 					<svg
+diff --git a/src/lib/components/workspace/Tools.svelte b/src/lib/components/workspace/Tools.svelte
+index 664a1af4..a9a198e1 100644
+--- a/src/lib/components/workspace/Tools.svelte
++++ b/src/lib/components/workspace/Tools.svelte
+@@ -6,6 +6,7 @@
+ 	import { onMount, getContext } from 'svelte';
+ 	import { WEBUI_NAME, prompts, tools } from '$lib/stores';
+ 	import { createNewPrompt, deletePromptByCommand, getPrompts } from '$lib/apis/prompts';
++	import { WEBUI_BASE_PATH } from '$lib/constants';
+ 
+ 	import { goto } from '$app/navigation';
+ 	import {
+@@ -64,7 +65,7 @@
+ 	<div>
+ 		<a
+ 			class=" px-2 py-2 rounded-xl border border-gray-200 dark:border-gray-600 dark:border-0 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 transition font-medium text-sm flex items-center space-x-1"
+-			href="/workspace/tools/create"
++			href="{WEBUI_BASE_PATH}/workspace/tools/create"
+ 		>
+ 			<svg
+ 				xmlns="http://www.w3.org/2000/svg"
+@@ -89,12 +90,12 @@
+ 			class=" flex space-x-4 cursor-pointer w-full px-3 py-2 dark:hover:bg-white/5 hover:bg-black/5 rounded-xl"
+ 			type="button"
+ 			on:click={() => {
+-				goto(`/workspace/tools/edit?id=${encodeURIComponent(tool.id)}`);
++				goto(`{WEBUI_BASE_PATH}/workspace/tools/edit?id=${encodeURIComponent(tool.id)}`);
+ 			}}
+ 		>
+ 			<div class=" flex flex-1 space-x-4 cursor-pointer w-full">
+ 				<a
+-					href={`/workspace/tools/edit?id=${encodeURIComponent(tool.id)}`}
++					href={WEBUI_BASE_PATH+`/workspace/tools/edit?id=${encodeURIComponent(tool.id)}`}
+ 					class="flex items-center text-left"
+ 				>
+ 					<div class=" flex-1 self-center pl-5">
+@@ -115,7 +116,7 @@
+ 					<a
+ 						class="self-center w-fit text-sm px-2 py-2 dark:text-gray-300 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-xl"
+ 						type="button"
+-						href={`/workspace/tools/edit?id=${encodeURIComponent(tool.id)}`}
++						href={WEBUI_BASE_PATH+`/workspace/tools/edit?id=${encodeURIComponent(tool.id)}`}
+ 					>
+ 						<svg
+ 							xmlns="http://www.w3.org/2000/svg"
+@@ -152,7 +153,7 @@
+ 									id: `${_tool.id}_clone`,
+ 									name: `${_tool.name} (Clone)`
+ 								});
+-								goto('/workspace/tools/create');
++								goto(WEBUI_BASE_PATH+'/workspace/tools/create');
+ 							}
+ 						}}
+ 					>
+diff --git a/src/lib/components/workspace/Tools/ToolkitEditor.svelte b/src/lib/components/workspace/Tools/ToolkitEditor.svelte
+index 81a3b10d..f39b94ac 100644
+--- a/src/lib/components/workspace/Tools/ToolkitEditor.svelte
++++ b/src/lib/components/workspace/Tools/ToolkitEditor.svelte
+@@ -6,6 +6,7 @@
+ 	import CodeEditor from './CodeEditor.svelte';
+ 	import { goto } from '$app/navigation';
+ 	import ConfirmDialog from '$lib/components/common/ConfirmDialog.svelte';
++	import { WEBUI_BASE_PATH } from '$lib/constants';
+ 
+ 	const dispatch = createEventDispatcher();
+ 
+@@ -68,7 +69,7 @@
+ 				<button
+ 					class="flex space-x-1"
+ 					on:click={() => {
+-						goto('/workspace/tools');
++						goto(WEBUI_BASE_PATH+'/workspace/tools');
+ 					}}
+ 					type="button"
+ 				>
+diff --git a/src/lib/constants.ts b/src/lib/constants.ts
+index 5fc1e7b1..8f2f06e0 100644
+--- a/src/lib/constants.ts
++++ b/src/lib/constants.ts
+@@ -2,10 +2,13 @@ import { browser, dev } from '$app/environment';
+ // import { version } from '../../package.json';
+ 
+ export const APP_NAME = 'Open WebUI';
++export const WEBUI_PREFIX = '@a21e259c-1c80-4d6b-928f-89716d576c13@';
++export const WEBUI_BASE_PATH = '/'+WEBUI_PREFIX+'/app';
+ 
+ export const WEBUI_HOSTNAME = browser ? (dev ? `${location.hostname}:8080` : ``) : '';
+-export const WEBUI_BASE_URL = browser ? (dev ? `http://${WEBUI_HOSTNAME}` : ``) : ``;
++export const WEBUI_BASE_URL = (browser ? (dev ? `http://${WEBUI_HOSTNAME}` : ``) : ``)+'/'+WEBUI_PREFIX;
+ export const WEBUI_API_BASE_URL = `${WEBUI_BASE_URL}/api/v1`;
++export const WEBUI_DEFAULT_USER_ICON = '/'+WEBUI_PREFIX+'/user.png';
+ 
+ export const OLLAMA_API_BASE_URL = `${WEBUI_BASE_URL}/ollama`;
+ export const OPENAI_API_BASE_URL = `${WEBUI_BASE_URL}/openai`;
+diff --git a/src/lib/utils/index.ts b/src/lib/utils/index.ts
+index 15ac73f1..9e6eb268 100644
+--- a/src/lib/utils/index.ts
++++ b/src/lib/utils/index.ts
+@@ -1,5 +1,6 @@
+ import { v4 as uuidv4 } from 'uuid';
+ import sha256 from 'js-sha256';
++import { WEBUI_DEFAULT_USER_ICON } from '$lib/constants';
+ 
+ //////////////////////////
+ // Helper functions
+@@ -136,7 +137,7 @@ export const generateInitialsImage = (name) => {
+ 		console.log(
+ 			'generateInitialsImage: failed pixel test, fingerprint evasion is likely. Using default image.'
+ 		);
+-		return '/user.png';
++		return WEBUI_DEFAULT_USER_ICON;
+ 	}
+ 
+ 	ctx.fillStyle = '#F39C12';
+diff --git a/src/routes/(app)/+layout.svelte b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/+layout.svelte
+similarity index 98%
+rename from src/routes/(app)/+layout.svelte
+rename to src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/+layout.svelte
+index 8973b9eb..f061315b 100644
+--- a/src/routes/(app)/+layout.svelte
++++ b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/+layout.svelte
+@@ -31,6 +31,7 @@
+ 		showCallOverlay,
+ 		tools
+ 	} from '$lib/stores';
++	import { WEBUI_BASE_PATH } from '$lib/constants';
+ 
+ 	import SettingsModal from '$lib/components/chat/SettingsModal.svelte';
+ 	import Sidebar from '$lib/components/layout/Sidebar.svelte';
+@@ -49,7 +50,7 @@
+ 
+ 	onMount(async () => {
+ 		if ($user === undefined) {
+-			await goto('/auth');
++			await goto(WEBUI_BASE_PATH+'/auth');
+ 		} else if (['user', 'admin'].includes($user.role)) {
+ 			try {
+ 				// Check if IndexedDB exists
+diff --git a/src/routes/(app)/+page.svelte b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/+page.svelte
+similarity index 100%
+rename from src/routes/(app)/+page.svelte
+rename to src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/+page.svelte
+diff --git a/src/routes/(app)/admin/+layout.svelte b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/admin/+layout.svelte
+similarity index 78%
+rename from src/routes/(app)/admin/+layout.svelte
+rename to src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/admin/+layout.svelte
+index e77c2417..c74e84fa 100644
+--- a/src/routes/(app)/admin/+layout.svelte
++++ b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/admin/+layout.svelte
+@@ -4,6 +4,7 @@
+ 	import { WEBUI_NAME, showSidebar } from '$lib/stores';
+ 	import MenuLines from '$lib/components/icons/MenuLines.svelte';
+ 	import { page } from '$app/stores';
++	import { WEBUI_BASE_PATH } from '$lib/constants';
+ 
+ 	const i18n = getContext('i18n');
+ </script>
+@@ -43,33 +44,33 @@
+ 			class="flex scrollbar-none overflow-x-auto w-fit text-center text-sm font-medium rounded-xl bg-transparent/10 p-1"
+ 		>
+ 			<a
+-				class="min-w-fit rounded-lg p-1.5 px-3 {['/admin', '/admin/'].includes($page.url.pathname)
++				class="min-w-fit rounded-lg p-1.5 px-3 {['{WEBUI_BASE_PATH}/admin', '{WEBUI_BASE_PATH}/admin/'].includes($page.url.pathname)
+ 					? 'bg-gray-50 dark:bg-gray-850'
+ 					: ''} transition"
+-				href="/admin">{$i18n.t('Dashboard')}</a
++				href="{WEBUI_BASE_PATH}/admin">{$i18n.t('Dashboard')}</a
+ 			>
+ 
+ 			<a
+ 				class="min-w-fit rounded-lg p-1.5 px-3 {$page.url.pathname.includes('/admin/settings')
+ 					? 'bg-gray-50 dark:bg-gray-850'
+ 					: ''} transition"
+-				href="/admin/settings">{$i18n.t('Settings')}</a
++				href="{WEBUI_BASE_PATH}/admin/settings">{$i18n.t('Settings')}</a
+ 			>
+ 
+ 			<!-- <a
+-				class="min-w-fit rounded-lg p-1.5 px-3 {$page.url.pathname.includes('/workspace/documents')
++				class="min-w-fit rounded-lg p-1.5 px-3 {$page.url.pathname.includes('{WEBUI_BASE_PATH}/workspace/documents')
+ 					? 'bg-gray-50 dark:bg-gray-850'
+ 					: ''} transition"
+-				href="/workspace/documents"
++				href="{WEBUI_BASE_PATH}/workspace/documents"
+ 			>
+ 				{$i18n.t('Documents')}
+ 			</a>
+ 
+ 			<a
+-				class="min-w-fit rounded-lg p-1.5 px-3 {$page.url.pathname.includes('/workspace/playground')
++				class="min-w-fit rounded-lg p-1.5 px-3 {$page.url.pathname.includes('{WEBUI_BASE_PATH}/workspace/playground')
+ 					? 'bg-gray-50 dark:bg-gray-850'
+ 					: ''} transition"
+-				href="/workspace/playground">{$i18n.t('Playground')}</a
++				href="{WEBUI_BASE_PATH}/workspace/playground">{$i18n.t('Playground')}</a
+ 			> -->
+ 		</div>
+ 	</div>
+diff --git a/src/routes/(app)/admin/+page.svelte b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/admin/+page.svelte
+similarity index 98%
+rename from src/routes/(app)/admin/+page.svelte
+rename to src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/admin/+page.svelte
+index 00a2c5fb..ab6a40c7 100644
+--- a/src/routes/(app)/admin/+page.svelte
++++ b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/admin/+page.svelte
+@@ -1,5 +1,5 @@
+ <script>
+-	import { WEBUI_BASE_URL } from '$lib/constants';
++	import { WEBUI_BASE_URL, WEBUI_BASE_PATH, WEBUI_DEFAULT_USER_ICON } from '$lib/constants';
+ 	import { WEBUI_NAME, config, user, showSidebar } from '$lib/stores';
+ 	import { goto } from '$app/navigation';
+ 	import { onMount, getContext } from 'svelte';
+@@ -69,7 +69,7 @@
+ 
+ 	onMount(async () => {
+ 		if ($user?.role !== 'admin') {
+-			await goto('/');
++			await goto(WEBUI_BASE_PATH+'/');
+ 		} else {
+ 			users = await getUsers(localStorage.token);
+ 		}
+@@ -195,7 +195,7 @@
+ 									user.profile_image_url.startsWith('https://www.gravatar.com/avatar/') ||
+ 									user.profile_image_url.startsWith('data:')
+ 										? user.profile_image_url
+-										: `/user.png`}
++										: WEBUI_DEFAULT_USER_ICON}
+ 									alt="user"
+ 								/>
+ 
+diff --git a/src/routes/(app)/admin/settings/+page.svelte b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/admin/settings/+page.svelte
+similarity index 100%
+rename from src/routes/(app)/admin/settings/+page.svelte
+rename to src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/admin/settings/+page.svelte
+diff --git a/src/routes/(app)/c/[id]/+page.svelte b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/c/[id]/+page.svelte
+similarity index 100%
+rename from src/routes/(app)/c/[id]/+page.svelte
+rename to src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/c/[id]/+page.svelte
+diff --git a/src/routes/(app)/workspace/+layout.svelte b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/+layout.svelte
+similarity index 78%
+rename from src/routes/(app)/workspace/+layout.svelte
+rename to src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/+layout.svelte
+index bb891d01..3b7a7ebe 100644
+--- a/src/routes/(app)/workspace/+layout.svelte
++++ b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/+layout.svelte
+@@ -2,6 +2,7 @@
+ 	import { onMount, getContext } from 'svelte';
+ 
+ 	import { WEBUI_NAME, showSidebar } from '$lib/stores';
++	import { WEBUI_BASE_PATH } from '$lib/constants';
+ 	import MenuLines from '$lib/components/icons/MenuLines.svelte';
+ 	import { page } from '$app/stores';
+ 
+@@ -43,42 +44,42 @@
+ 			class="flex scrollbar-none overflow-x-auto w-fit text-center text-sm font-medium rounded-xl bg-transparent/10 p-1"
+ 		>
+ 			<a
+-				class="min-w-fit rounded-lg p-1.5 px-3 {$page.url.pathname.includes('/workspace/models')
++				class="min-w-fit rounded-lg p-1.5 px-3 {$page.url.pathname.includes(WEBUI_BASE_PATH+'/workspace/models')
+ 					? 'bg-gray-50 dark:bg-gray-850'
+ 					: ''} transition"
+-				href="/workspace/models">{$i18n.t('Models')}</a
++				href="{WEBUI_BASE_PATH}/workspace/models">{$i18n.t('Models')}</a
+ 			>
+ 
+ 			<a
+-				class="min-w-fit rounded-lg p-1.5 px-3 {$page.url.pathname.includes('/workspace/prompts')
++				class="min-w-fit rounded-lg p-1.5 px-3 {$page.url.pathname.includes(WEBUI_BASE_PATH+'/workspace/prompts')
+ 					? 'bg-gray-50 dark:bg-gray-850'
+ 					: ''} transition"
+-				href="/workspace/prompts">{$i18n.t('Prompts')}</a
++				href="{WEBUI_BASE_PATH}/workspace/prompts">{$i18n.t('Prompts')}</a
+ 			>
+ 
+ 			<a
+-				class="min-w-fit rounded-lg p-1.5 px-3 {$page.url.pathname.includes('/workspace/documents')
++				class="min-w-fit rounded-lg p-1.5 px-3 {$page.url.pathname.includes(WEBUI_BASE_PATH+'/workspace/documents')
+ 					? 'bg-gray-50 dark:bg-gray-850'
+ 					: ''} transition"
+-				href="/workspace/documents"
++				href="{WEBUI_BASE_PATH}/workspace/documents"
+ 			>
+ 				{$i18n.t('Documents')}
+ 			</a>
+ 
+ 			<a
+-				class="min-w-fit rounded-lg p-1.5 px-3 {$page.url.pathname.includes('/workspace/tools')
++				class="min-w-fit rounded-lg p-1.5 px-3 {$page.url.pathname.includes(WEBUI_BASE_PATH+'/workspace/tools')
+ 					? 'bg-gray-50 dark:bg-gray-850'
+ 					: ''} transition"
+-				href="/workspace/tools"
++				href="{WEBUI_BASE_PATH}/workspace/tools"
+ 			>
+ 				{$i18n.t('Tools')}
+ 			</a>
+ 
+ 			<a
+-				class="min-w-fit rounded-lg p-1.5 px-3 {$page.url.pathname.includes('/workspace/playground')
++				class="min-w-fit rounded-lg p-1.5 px-3 {$page.url.pathname.includes(WEBUI_BASE_PATH+'/workspace/playground')
+ 					? 'bg-gray-50 dark:bg-gray-850'
+ 					: ''} transition"
+-				href="/workspace/playground">{$i18n.t('Playground')}</a
++				href="{WEBUI_BASE_PATH}/workspace/playground">{$i18n.t('Playground')}</a
+ 			>
+ 		</div>
+ 	</div>
+diff --git a/src/routes/(app)/workspace/+page.svelte b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/+page.svelte
+similarity index 57%
+rename from src/routes/(app)/workspace/+page.svelte
+rename to src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/+page.svelte
+index a33774cf..f1f5db5b 100644
+--- a/src/routes/(app)/workspace/+page.svelte
++++ b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/+page.svelte
+@@ -1,8 +1,9 @@
+ <script lang="ts">
+ 	import { goto } from '$app/navigation';
+ 	import { onMount } from 'svelte';
++	import { WEBUI_BASE_PATH } from '$lib/constants';
+ 
+ 	onMount(() => {
+-		goto('/workspace/models');
++		goto(WEBUI_BASE_PATH+'/workspace/models');
+ 	});
+ </script>
+diff --git a/src/routes/(app)/workspace/documents/+page.svelte b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/documents/+page.svelte
+similarity index 100%
+rename from src/routes/(app)/workspace/documents/+page.svelte
+rename to src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/documents/+page.svelte
+diff --git a/src/routes/(app)/workspace/models/+page.svelte b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/models/+page.svelte
+similarity index 100%
+rename from src/routes/(app)/workspace/models/+page.svelte
+rename to src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/models/+page.svelte
+diff --git a/src/routes/(app)/workspace/models/create/+page.svelte b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/models/create/+page.svelte
+similarity index 98%
+rename from src/routes/(app)/workspace/models/create/+page.svelte
+rename to src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/models/create/+page.svelte
+index 130818c6..2e8c5747 100644
+--- a/src/routes/(app)/workspace/models/create/+page.svelte
++++ b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/models/create/+page.svelte
+@@ -14,6 +14,7 @@
+ 	import Knowledge from '$lib/components/workspace/Models/Knowledge.svelte';
+ 	import ToolsSelector from '$lib/components/workspace/Models/ToolsSelector.svelte';
+ 	import { stringify } from 'postcss';
++	import { WEBUI_BASE_PATH, WEBUI_PREFIX } from '$lib/constants';
+ 
+ 	const i18n = getContext('i18n');
+ 
+@@ -120,7 +121,7 @@
+ 				...info,
+ 				meta: {
+ 					...info.meta,
+-					profile_image_url: info.meta.profile_image_url ?? '/favicon.png',
++					profile_image_url: info.meta.profile_image_url ?? '/'+WEBUI_PREFIX+'/favicon.png',
+ 					suggestion_prompts: info.meta.suggestion_prompts
+ 						? info.meta.suggestion_prompts.filter((prompt) => prompt.content !== '')
+ 						: null
+@@ -131,7 +132,7 @@
+ 			if (res) {
+ 				await models.set(await getModels(localStorage.token));
+ 				toast.success('Model created successfully!');
+-				await goto('/workspace/models');
++				await goto(WEBUI_BASE_PATH+'/workspace/models');
+ 			}
+ 		}
+ 
+@@ -273,7 +274,7 @@
+ 	<button
+ 		class="flex space-x-1"
+ 		on:click={() => {
+-			goto('/workspace/models');
++			goto(WEBUI_BASE_PATH+'/workspace/models');
+ 		}}
+ 	>
+ 		<div class=" self-center">
+diff --git a/src/routes/(app)/workspace/models/edit/+page.svelte b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/models/edit/+page.svelte
+similarity index 98%
+rename from src/routes/(app)/workspace/models/edit/+page.svelte
+rename to src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/models/edit/+page.svelte
+index 95505d3e..7d3e23fb 100644
+--- a/src/routes/(app)/workspace/models/edit/+page.svelte
++++ b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/models/edit/+page.svelte
+@@ -16,6 +16,7 @@
+ 	import Tags from '$lib/components/common/Tags.svelte';
+ 	import Knowledge from '$lib/components/workspace/Models/Knowledge.svelte';
+ 	import ToolsSelector from '$lib/components/workspace/Models/ToolsSelector.svelte';
++	import { WEBUI_BASE_PATH, WEBUI_PREFIX } from '$lib/constants';
+ 
+ 	const i18n = getContext('i18n');
+ 
+@@ -45,7 +46,7 @@
+ 		base_model_id: null,
+ 		name: '',
+ 		meta: {
+-			profile_image_url: '/favicon.png',
++			profile_image_url: '/'+WEBUI_PREFIX+'/favicon.png',
+ 			description: '',
+ 			suggestion_prompts: null,
+ 			tags: []
+@@ -98,7 +99,7 @@
+ 		if (res) {
+ 			await models.set(await getModels(localStorage.token));
+ 			toast.success('Model updated successfully');
+-			await goto('/workspace/models');
++			await goto(WEBUI_BASE_PATH+'/workspace/models');
+ 		}
+ 
+ 		loading = false;
+@@ -157,10 +158,10 @@
+ 
+ 				console.log(model);
+ 			} else {
+-				goto('/workspace/models');
++				goto(WEBUI_BASE_PATH+'/workspace/models');
+ 			}
+ 		} else {
+-			goto('/workspace/models');
++			goto(WEBUI_BASE_PATH+'/workspace/models');
+ 		}
+ 	});
+ </script>
+@@ -234,7 +235,7 @@
+ 	<button
+ 		class="flex space-x-1"
+ 		on:click={() => {
+-			goto('/workspace/models');
++			goto(WEBUI_BASE_PATH+'/workspace/models');
+ 		}}
+ 	>
+ 		<div class=" self-center">
+diff --git a/src/routes/(app)/workspace/playground/+page.svelte b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/playground/+page.svelte
+similarity index 100%
+rename from src/routes/(app)/workspace/playground/+page.svelte
+rename to src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/playground/+page.svelte
+diff --git a/src/routes/(app)/workspace/prompts/+page.svelte b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/prompts/+page.svelte
+similarity index 100%
+rename from src/routes/(app)/workspace/prompts/+page.svelte
+rename to src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/prompts/+page.svelte
+diff --git a/src/routes/(app)/workspace/prompts/create/+page.svelte b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/prompts/create/+page.svelte
+similarity index 98%
+rename from src/routes/(app)/workspace/prompts/create/+page.svelte
+rename to src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/prompts/create/+page.svelte
+index 67cbd371..e05b7772 100644
+--- a/src/routes/(app)/workspace/prompts/create/+page.svelte
++++ b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/prompts/create/+page.svelte
+@@ -6,6 +6,7 @@
+ 	import { onMount, tick, getContext } from 'svelte';
+ 
+ 	import { createNewPrompt, getPrompts } from '$lib/apis/prompts';
++	import { WEBUI_BASE_PATH } from '$lib/constants';
+ 
+ 	const i18n = getContext('i18n');
+ 
+@@ -35,7 +36,7 @@
+ 
+ 			if (prompt) {
+ 				await prompts.set(await getPrompts(localStorage.token));
+-				await goto('/workspace/prompts');
++				await goto(WEBUI_BASE_PATH+'/workspace/prompts');
+ 			}
+ 		} else {
+ 			toast.error(
+diff --git a/src/routes/(app)/workspace/prompts/edit/+page.svelte b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/prompts/edit/+page.svelte
+similarity index 96%
+rename from src/routes/(app)/workspace/prompts/edit/+page.svelte
+rename to src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/prompts/edit/+page.svelte
+index 6de8e194..406bd038 100644
+--- a/src/routes/(app)/workspace/prompts/edit/+page.svelte
++++ b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/prompts/edit/+page.svelte
+@@ -9,6 +9,7 @@
+ 
+ 	import { getPrompts, updatePromptByCommand } from '$lib/apis/prompts';
+ 	import { page } from '$app/stores';
++	import { WEBUI_BASE_PATH } from '$lib/constants';
+ 
+ 	let loading = false;
+ 
+@@ -33,7 +34,7 @@
+ 
+ 			if (prompt) {
+ 				await prompts.set(await getPrompts(localStorage.token));
+-				await goto('/workspace/prompts');
++				await goto(WEBUI_BASE_PATH+'/workspace/prompts');
+ 			}
+ 		} else {
+ 			toast.error(
+@@ -67,10 +68,10 @@
+ 				command = prompt.command.slice(1);
+ 				content = prompt.content;
+ 			} else {
+-				goto('/workspace/prompts');
++				goto(WEBUI_BASE_PATH+'/workspace/prompts');
+ 			}
+ 		} else {
+-			goto('/workspace/prompts');
++			goto(WEBUI_BASE_PATH+'/workspace/prompts');
+ 		}
+ 	});
+ </script>
+diff --git a/src/routes/(app)/workspace/tools/+page.svelte b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/tools/+page.svelte
+similarity index 100%
+rename from src/routes/(app)/workspace/tools/+page.svelte
+rename to src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/tools/+page.svelte
+diff --git a/src/routes/(app)/workspace/tools/create/+page.svelte b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/tools/create/+page.svelte
+similarity index 92%
+rename from src/routes/(app)/workspace/tools/create/+page.svelte
+rename to src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/tools/create/+page.svelte
+index c785c74c..2c7673e2 100644
+--- a/src/routes/(app)/workspace/tools/create/+page.svelte
++++ b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/tools/create/+page.svelte
+@@ -5,6 +5,7 @@
+ 	import { tools } from '$lib/stores';
+ 	import { onMount } from 'svelte';
+ 	import { toast } from 'svelte-sonner';
++	import { WEBUI_BASE_PATH } from '$lib/constants';
+ 
+ 	let mounted = false;
+ 	let clone = false;
+@@ -26,7 +27,7 @@
+ 			toast.success('Tool created successfully');
+ 			tools.set(await getTools(localStorage.token));
+ 
+-			await goto('/workspace/tools');
++			await goto(WEBUI_BASE_PATH+'/workspace/tools');
+ 		}
+ 	};
+ 
+diff --git a/src/routes/(app)/workspace/tools/edit/+page.svelte b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/tools/edit/+page.svelte
+similarity index 90%
+rename from src/routes/(app)/workspace/tools/edit/+page.svelte
+rename to src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/tools/edit/+page.svelte
+index b8ca3250..81b9926e 100644
+--- a/src/routes/(app)/workspace/tools/edit/+page.svelte
++++ b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/(app)/workspace/tools/edit/+page.svelte
+@@ -7,6 +7,7 @@
+ 	import { tools } from '$lib/stores';
+ 	import { onMount } from 'svelte';
+ 	import { toast } from 'svelte-sonner';
++	import { WEBUI_BASE_PATH } from '$lib/constants';
+ 
+ 	let tool = null;
+ 
+@@ -26,7 +27,7 @@
+ 			toast.success('Tool updated successfully');
+ 			tools.set(await getTools(localStorage.token));
+ 
+-			// await goto('/workspace/tools');
++			// await goto(WEBUI_BASE_PATH+'/workspace/tools');
+ 		}
+ 	};
+ 
+@@ -37,7 +38,7 @@
+ 		if (id) {
+ 			tool = await getToolById(localStorage.token, id).catch((error) => {
+ 				toast.error(error);
+-				goto('/workspace/tools');
++				goto(WEBUI_BASE_PATH+'/workspace/tools');
+ 				return null;
+ 			});
+ 
+diff --git a/src/routes/+error.svelte b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/+error.svelte
+similarity index 100%
+rename from src/routes/+error.svelte
+rename to src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/+error.svelte
+diff --git a/src/routes/+layout.js b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/+layout.js
+similarity index 100%
+rename from src/routes/+layout.js
+rename to src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/+layout.js
+diff --git a/src/routes/+layout.svelte b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/+layout.svelte
+similarity index 88%
+rename from src/routes/+layout.svelte
+rename to src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/+layout.svelte
+index 2493a94d..c9c591d8 100644
+--- a/src/routes/+layout.svelte
++++ b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/+layout.svelte
+@@ -28,7 +28,7 @@
+ 
+ 	import 'tippy.js/dist/tippy.css';
+ 
+-	import { WEBUI_BASE_URL, WEBUI_HOSTNAME } from '$lib/constants';
++	import { WEBUI_BASE_URL, WEBUI_HOSTNAME, WEBUI_BASE_PATH, WEBUI_PREFIX } from '$lib/constants';
+ 	import i18n, { initI18n, getLanguages } from '$lib/i18n';
+ 
+ 	setContext('i18n', i18n);
+@@ -75,7 +75,7 @@
+ 
+ 			if ($config) {
+ 				const _socket = io(`${WEBUI_BASE_URL}`, {
+-					path: '/ws/socket.io',
++					path: '/'+WEBUI_PREFIX+'/ws/socket.io',
+ 					auth: { token: localStorage.token }
+ 				});
+ 
+@@ -108,15 +108,15 @@
+ 					} else {
+ 						// Redirect Invalid Session User to /auth Page
+ 						localStorage.removeItem('token');
+-						await goto('/auth');
++						await goto(WEBUI_BASE_PATH+'/auth');
+ 					}
+ 				} else {
+-					await goto('/auth');
++					await goto(WEBUI_BASE_PATH+'/auth');
+ 				}
+ 			}
+ 		} else {
+ 			// Redirect to /error when Backend Not Detected
+-			await goto(`/error`);
++			await goto(WEBUI_BASE_PATH+'/error');
+ 		}
+ 
+ 		await tick();
+@@ -137,7 +137,7 @@
+ 
+ 			document.getElementById('splash-screen')?.remove();
+ 
+-			const audio = new Audio(`/audio/greeting.mp3`);
++			const audio = new Audio(WEBUI_BASE_PATH+`/audio/greeting.mp3`);
+ 			const playAudio = () => {
+ 				audio.play();
+ 				document.removeEventListener('click', playAudio);
+@@ -163,8 +163,8 @@
+ 
+ 	<!-- rosepine themes have been disabled as it's not up to date with our latest version. -->
+ 	<!-- feel free to make a PR to fix if anyone wants to see it return -->
+-	<!-- <link rel="stylesheet" type="text/css" href="/themes/rosepine.css" />
+-	<link rel="stylesheet" type="text/css" href="/themes/rosepine-dawn.css" /> -->
++	<!-- <link rel="stylesheet" type="text/css" href="{WEBUI_BASE_PATH}/themes/rosepine.css" />
++	<link rel="stylesheet" type="text/css" href="{WEBUI_BASE_PATH}/themes/rosepine-dawn.css" /> -->
+ </svelte:head>
+ 
+ {#if loaded}
+diff --git a/src/routes/auth/+page.svelte b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/auth/+page.svelte
+similarity index 97%
+rename from src/routes/auth/+page.svelte
+rename to src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/auth/+page.svelte
+index 42a1faca..8bf8a63f 100644
+--- a/src/routes/auth/+page.svelte
++++ b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/auth/+page.svelte
+@@ -2,7 +2,7 @@
+ 	import { goto } from '$app/navigation';
+ 	import { userSignIn, userSignUp } from '$lib/apis/auths';
+ 	import Spinner from '$lib/components/common/Spinner.svelte';
+-	import { WEBUI_API_BASE_URL, WEBUI_BASE_URL } from '$lib/constants';
++	import { WEBUI_API_BASE_URL, WEBUI_BASE_URL, WEBUI_BASE_PATH } from '$lib/constants';
+ 	import { WEBUI_NAME, config, user, socket } from '$lib/stores';
+ 	import { onMount, getContext } from 'svelte';
+ 	import { toast } from 'svelte-sonner';
+@@ -25,7 +25,7 @@
+ 
+ 			$socket.emit('user-join', { auth: { token: sessionUser.token } });
+ 			await user.set(sessionUser);
+-			goto('/');
++			goto(WEBUI_BASE_PATH+'/');
+ 		}
+ 	};
+ 
+@@ -59,7 +59,7 @@
+ 
+ 	onMount(async () => {
+ 		if ($user !== undefined) {
+-			await goto('/');
++			await goto(WEBUI_BASE_PATH+'/');
+ 		}
+ 		loaded = true;
+ 		if (($config?.features.auth_trusted_header ?? false) || $config?.features.auth === false) {
+diff --git a/src/routes/error/+page.svelte b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/error/+page.svelte
+similarity index 92%
+rename from src/routes/error/+page.svelte
+rename to src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/error/+page.svelte
+index 95518660..242d10f2 100644
+--- a/src/routes/error/+page.svelte
++++ b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/error/+page.svelte
+@@ -2,6 +2,7 @@
+ 	import { goto } from '$app/navigation';
+ 	import { WEBUI_NAME, config } from '$lib/stores';
+ 	import { onMount, getContext } from 'svelte';
++	import { WEBUI_BASE_PATH } from '$lib/constants';
+ 
+ 	const i18n = getContext('i18n');
+ 
+@@ -9,7 +10,7 @@
+ 
+ 	onMount(async () => {
+ 		if ($config) {
+-			await goto('/');
++			await goto(WEBUI_BASE_PATH+'/');
+ 		}
+ 
+ 		loaded = true;
+@@ -47,7 +48,7 @@
+ 						<button
+ 							class="relative z-20 flex px-5 py-2 rounded-full bg-gray-100 hover:bg-gray-200 transition font-medium text-sm"
+ 							on:click={() => {
+-								location.href = '/';
++								location.href = WEBUI_BASE_PATH+'/';
+ 							}}
+ 						>
+ 							{$i18n.t('Check Again')}
+diff --git a/src/routes/s/[id]/+page.svelte b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/s/[id]/+page.svelte
+similarity index 96%
+rename from src/routes/s/[id]/+page.svelte
+rename to src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/s/[id]/+page.svelte
+index 73be10d3..89f997f9 100644
+--- a/src/routes/s/[id]/+page.svelte
++++ b/src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@/s/[id]/+page.svelte
+@@ -7,6 +7,7 @@
+ 
+ 	import { settings, chatId, WEBUI_NAME, models } from '$lib/stores';
+ 	import { convertMessagesToHistory } from '$lib/utils';
++	import { WEBUI_BASE_PATH } from '$lib/constants';
+ 
+ 	import { getChatByShareId } from '$lib/apis/chats';
+ 
+@@ -60,7 +61,7 @@
+ 				await tick();
+ 				loaded = true;
+ 			} else {
+-				await goto('/');
++				await goto(WEBUI_BASE_PATH+'/');
+ 			}
+ 		})();
+ 	}
+@@ -73,7 +74,7 @@
+ 		await models.set(await getModels(localStorage.token));
+ 		await chatId.set($page.params.id);
+ 		chat = await getChatByShareId(localStorage.token, $chatId).catch(async (error) => {
+-			await goto('/');
++			await goto(WEBUI_BASE_PATH+'/');
+ 			return null;
+ 		});
+ 
+diff --git a/src/routes/app.css b/src/routes/app.css
+new file mode 120000
+index 00000000..0ca062d0
+--- /dev/null
++++ b/src/routes/app.css
+@@ -0,0 +1 @@
++../app.css
+\ No newline at end of file
+diff --git a/src/routes/app.d.ts b/src/routes/app.d.ts
+new file mode 120000
+index 00000000..0eae7a40
+--- /dev/null
++++ b/src/routes/app.d.ts
+@@ -0,0 +1 @@
++../app.d.ts
+\ No newline at end of file
+diff --git a/src/routes/app.html b/src/routes/app.html
+new file mode 120000
+index 00000000..937ed8e1
+--- /dev/null
++++ b/src/routes/app.html
+@@ -0,0 +1 @@
++../app.html
+\ No newline at end of file
+diff --git a/src/routes/lib b/src/routes/lib
+new file mode 120000
+index 00000000..dc598c56
+--- /dev/null
++++ b/src/routes/lib
+@@ -0,0 +1 @@
++../lib
+\ No newline at end of file
+diff --git a/src/routes/tailwind.css b/src/routes/tailwind.css
+new file mode 120000
+index 00000000..dcb64063
+--- /dev/null
++++ b/src/routes/tailwind.css
+@@ -0,0 +1 @@
++../tailwind.css
+\ No newline at end of file
+diff --git a/svelte.config.js b/svelte.config.js
+index 1ff7ceeb..21d604fc 100644
+--- a/svelte.config.js
++++ b/svelte.config.js
+@@ -14,7 +14,8 @@ const config = {
+ 			pages: 'build',
+ 			assets: 'build',
+ 			fallback: 'index.html'
+-		})
++		}),
++		appDir: '@a21e259c-1c80-4d6b-928f-89716d576c13@/app'
+ 	},
+ 	onwarn: (warning, handler) => {
+ 		const { code, _ } = warning;
+diff --git a/vite.config.ts b/vite.config.ts
+index c6af4bba..a0f3dedf 100644
+--- a/vite.config.ts
++++ b/vite.config.ts
+@@ -24,6 +24,9 @@ export default defineConfig({
+ 	build: {
+ 		sourcemap: true
+ 	},
++	build: {
++		minify: true
++        },
+ 	worker: {
+ 		format: 'es'
+ 	}

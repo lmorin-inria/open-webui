@@ -1,18 +1,18 @@
 @font-face {
 	font-family: 'Inter';
-	src: url('/assets/fonts/Inter-Variable.ttf');
+	src: url('/@a21e259c-1c80-4d6b-928f-89716d576c13@/assets/fonts/Inter-Variable.ttf');
 	font-display: swap;
 }
 
 @font-face {
 	font-family: 'Archivo';
-	src: url('/assets/fonts/Archivo-Variable.ttf');
+	src: url('/@a21e259c-1c80-4d6b-928f-89716d576c13@/assets/fonts/Archivo-Variable.ttf');
 	font-display: swap;
 }
 
 @font-face {
 	font-family: 'Mona Sans';
-	src: url('/assets/fonts/Mona-Sans.woff2');
+	src: url('/@a21e259c-1c80-4d6b-928f-89716d576c13@/assets/fonts/Mona-Sans.woff2');
 	font-display: swap;
 }
 

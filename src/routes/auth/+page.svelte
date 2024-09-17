@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { getSessionUser, userSignIn, userSignUp } from '$lib/apis/auths';
 	import Spinner from '$lib/components/common/Spinner.svelte';
+        import { WEBUI_BASE_PATH } from '$lib/constants';
 	import { WEBUI_API_BASE_URL, WEBUI_BASE_URL } from '$lib/constants';
 	import { WEBUI_NAME, config, user, socket } from '$lib/stores';
 	import { onMount, getContext } from 'svelte';
@@ -30,7 +31,7 @@
 			$socket.emit('user-join', { auth: { token: sessionUser.token } });
 			await user.set(sessionUser);
 			await config.set(await getBackendConfig());
-			goto('/');
+			goto(WEBUI_BASE_PATH+'/');
 		}
 	};
 
@@ -88,7 +89,7 @@
 
 	onMount(async () => {
 		if ($user !== undefined) {
-			await goto('/');
+			await goto(WEBUI_BASE_PATH+'/');
 		}
 		await checkOauthCallback();
 		loaded = true;

@@ -1,5 +1,6 @@
 <script>
 	import { toast } from 'svelte-sonner';
+        import { WEBUI_BASE_PATH } from '$lib/constants';
 
 	import { goto } from '$app/navigation';
 	import { prompts } from '$lib/stores';
@@ -33,7 +34,7 @@
 
 			if (prompt) {
 				await prompts.set(await getPrompts(localStorage.token));
-				await goto('/workspace/prompts');
+				await goto(WEBUI_BASE_PATH+'/workspace/prompts');
 			}
 		} else {
 			toast.error(
@@ -67,10 +68,10 @@
 				command = prompt.command.slice(1);
 				content = prompt.content;
 			} else {
-				goto('/workspace/prompts');
+				goto(WEBUI_BASE_PATH+'/workspace/prompts');
 			}
 		} else {
-			goto('/workspace/prompts');
+			goto(WEBUI_BASE_PATH+'/workspace/prompts');
 		}
 	});
 </script>

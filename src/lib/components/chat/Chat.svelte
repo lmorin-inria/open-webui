@@ -10,6 +10,7 @@
 	import type { Unsubscriber, Writable } from 'svelte/store';
 	import type { i18n as i18nType } from 'i18next';
 	import { WEBUI_BASE_URL } from '$lib/constants';
+        import { WEBUI_BASE_PATH } from '$lib/constants';
 
 	import {
 		chatId,
@@ -270,7 +271,7 @@
 
 	const initNewChat = async () => {
 		if ($page.url.pathname.includes('/c/')) {
-			window.history.replaceState(history.state, '', `/`);
+			window.history.replaceState(history.state, '', WEBUI_BASE_PATH+'/');
 		}
 
 		await chatId.set('');
@@ -415,7 +416,7 @@
 				timestamp: m.timestamp
 			})),
 			chat_id: chatId,
-			session_id: $socket?.id,
+		        session_id: $socket? $socket.id : '-',
 			id: responseMessageId
 		}).catch((error) => {
 			toast.error(error);
@@ -1085,7 +1086,7 @@
 		}
 
 		if (messages.length == 2 && messages.at(1).content !== '' && selectedModels[0] === model.id) {
-			window.history.replaceState(history.state, '', `/c/${_chatId}`);
+			window.history.replaceState(history.state, '', WEBUI_BASE_PATH+`/c/${_chatId}`);
 			const _title = await generateChatTitle(userPrompt);
 			await setChatTitle(_chatId, _title);
 		}
@@ -1357,7 +1358,7 @@
 		}
 
 		if (messages.length == 2 && selectedModels[0] === model.id) {
-			window.history.replaceState(history.state, '', `/c/${_chatId}`);
+			window.history.replaceState(history.state, '', WEBUI_BASE_PATH+`/c/${_chatId}`);
 
 			const _title = await generateChatTitle(userPrompt);
 			await setChatTitle(_chatId, _title);

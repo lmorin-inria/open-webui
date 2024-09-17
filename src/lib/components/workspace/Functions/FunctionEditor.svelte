@@ -1,6 +1,7 @@
 <script>
 	import { getContext, createEventDispatcher, onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+        import { WEBUI_BASE_PATH } from '$lib/constants';
 
 	const dispatch = createEventDispatcher();
 	const i18n = getContext('i18n');
@@ -281,7 +282,7 @@ class Pipe:
 				<button
 					class="flex space-x-1"
 					on:click={() => {
-						goto('/workspace/functions');
+						goto(WEBUI_BASE_PATH+'/workspace/functions');
 					}}
 					type="button"
 				>

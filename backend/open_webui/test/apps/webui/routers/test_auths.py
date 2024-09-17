@@ -1,3 +1,4 @@
+from open_webui.env import WEBUI_DEFAULT_USER_ICON
 from test.util.abstract_integration_test import AbstractPostgresTest
 from test.util.mock_user import mock_webui_user
 
@@ -22,7 +23,7 @@ class TestAuths(AbstractPostgresTest):
             "name": "John Doe",
             "email": "john.doe@openwebui.com",
             "role": "user",
-            "profile_image_url": "/user.png",
+            "profile_image_url": WEBUI_DEFAULT_USER_ICON,
         }
 
     def test_update_profile(self):
@@ -32,7 +33,7 @@ class TestAuths(AbstractPostgresTest):
             email="john.doe@openwebui.com",
             password=get_password_hash("old_password"),
             name="John Doe",
-            profile_image_url="/user.png",
+            profile_image_url=WEBUI_DEFAULT_USER_ICON,
             role="user",
         )
 
@@ -53,7 +54,7 @@ class TestAuths(AbstractPostgresTest):
             email="john.doe@openwebui.com",
             password=get_password_hash("old_password"),
             name="John Doe",
-            profile_image_url="/user.png",
+            profile_image_url=WEBUI_DEFAULT_USER_ICON,
             role="user",
         )
 
@@ -80,7 +81,7 @@ class TestAuths(AbstractPostgresTest):
             email="john.doe@openwebui.com",
             password=get_password_hash("password"),
             name="John Doe",
-            profile_image_url="/user.png",
+            profile_image_url=WEBUI_DEFAULT_USER_ICON,
             role="user",
         )
         response = self.fast_api_client.post(
@@ -93,7 +94,7 @@ class TestAuths(AbstractPostgresTest):
         assert data["name"] == "John Doe"
         assert data["email"] == "john.doe@openwebui.com"
         assert data["role"] == "user"
-        assert data["profile_image_url"] == "/user.png"
+        assert data["profile_image_url"] == WEBUI_DEFAULT_USER_ICON
         assert data["token"] is not None and len(data["token"]) > 0
         assert data["token_type"] == "Bearer"
 
@@ -112,7 +113,7 @@ class TestAuths(AbstractPostgresTest):
         assert data["name"] == "John Doe"
         assert data["email"] == "john.doe@openwebui.com"
         assert data["role"] in ["admin", "user", "pending"]
-        assert data["profile_image_url"] == "/user.png"
+        assert data["profile_image_url"] == WEBUI_DEFAULT_USER_ICON
         assert data["token"] is not None and len(data["token"]) > 0
         assert data["token_type"] == "Bearer"
 
@@ -133,7 +134,7 @@ class TestAuths(AbstractPostgresTest):
         assert data["name"] == "John Doe 2"
         assert data["email"] == "john.doe2@openwebui.com"
         assert data["role"] == "admin"
-        assert data["profile_image_url"] == "/user.png"
+        assert data["profile_image_url"] == WEBUI_DEFAULT_USER_ICON
         assert data["token"] is not None and len(data["token"]) > 0
         assert data["token_type"] == "Bearer"
 
@@ -142,7 +143,7 @@ class TestAuths(AbstractPostgresTest):
             email="john.doe@openwebui.com",
             password="password",
             name="John Doe",
-            profile_image_url="/user.png",
+            profile_image_url=WEBUI_DEFAULT_USER_ICON,
             role="admin",
         )
         with mock_webui_user():
@@ -159,7 +160,7 @@ class TestAuths(AbstractPostgresTest):
             email="john.doe@openwebui.com",
             password="password",
             name="John Doe",
-            profile_image_url="/user.png",
+            profile_image_url=WEBUI_DEFAULT_USER_ICON,
             role="admin",
         )
         with mock_webui_user(id=user.id):
@@ -174,7 +175,7 @@ class TestAuths(AbstractPostgresTest):
             email="john.doe@openwebui.com",
             password="password",
             name="John Doe",
-            profile_image_url="/user.png",
+            profile_image_url=WEBUI_DEFAULT_USER_ICON,
             role="admin",
         )
         self.users.update_user_api_key_by_id(user.id, "abc")
@@ -190,7 +191,7 @@ class TestAuths(AbstractPostgresTest):
             email="john.doe@openwebui.com",
             password="password",
             name="John Doe",
-            profile_image_url="/user.png",
+            profile_image_url=WEBUI_DEFAULT_USER_ICON,
             role="admin",
         )
         self.users.update_user_api_key_by_id(user.id, "abc")

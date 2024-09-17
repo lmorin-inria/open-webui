@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { config, models, settings, showCallOverlay } from '$lib/stores';
 	import { onMount, tick, getContext, onDestroy, createEventDispatcher } from 'svelte';
+        import { WEBUI_BASE_PATH } from '$lib/constants';
 
 	const dispatch = createEventDispatcher();
 
@@ -636,6 +637,8 @@
 		await stopRecordingCallback(false);
 		await stopCamera();
 	});
+
+  const FAVICON = WEBUI_BASE_PATH+'/static/favicon.png';
 </script>
 
 {#if $showCallOverlay}
@@ -708,12 +711,12 @@
 								? ' size-16'
 								: rmsLevel * 100 > 1
 									? 'size-14'
-									: 'size-12'}  transition-all rounded-full {(model?.info?.meta
-							?.profile_image_url ?? '/static/favicon.png') !== '/static/favicon.png'
+									: 'size-12'}  transition-all rounded-full
+							{(model?.info?.meta?.profile_image_url ?? FAVICON) !== FAVICON
 							? ' bg-cover bg-center bg-no-repeat'
 							: 'bg-black dark:bg-white'}  bg-black dark:bg-white"
-						style={(model?.info?.meta?.profile_image_url ?? '/static/favicon.png') !==
-						'/static/favicon.png'
+						style={(model?.info?.meta?.profile_image_url ?? FAVICON) !==
+					        FAVICON
 							? `background-image: url('${model?.info?.meta?.profile_image_url}');`
 							: ''}
 					/>
@@ -791,11 +794,11 @@
 									: rmsLevel * 100 > 1
 										? 'size-44'
 										: 'size-40'}  transition-all rounded-full {(model?.info?.meta
-								?.profile_image_url ?? '/static/favicon.png') !== '/static/favicon.png'
+								?.profile_image_url ?? FAVICON) !== FAVICON
 								? ' bg-cover bg-center bg-no-repeat'
 								: 'bg-black dark:bg-white'} "
-							style={(model?.info?.meta?.profile_image_url ?? '/static/favicon.png') !==
-							'/static/favicon.png'
+							style={(model?.info?.meta?.profile_image_url ?? FAVICON) !==
+							FAVICON
 								? `background-image: url('${model?.info?.meta?.profile_image_url}');`
 								: ''}
 						/>

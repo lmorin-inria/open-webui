@@ -457,6 +457,8 @@ if frontend_splash.exists():
 else:
     logging.warning(f"Frontend splash not found at {frontend_splash}")
 
+FRONTEND_APP_ROOT = str(Path(os.getenv("FRONTEND_APP_ROOT", "/@a21e259c-1c80-4d6b-928f-89716d576c13@")))
+
 
 ####################################
 # CUSTOM_NAME

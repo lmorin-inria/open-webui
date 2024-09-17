@@ -3,6 +3,7 @@
 	import { goto, invalidate, invalidateAll } from '$app/navigation';
 	import { onMount, getContext, createEventDispatcher, tick } from 'svelte';
 	const i18n = getContext('i18n');
+        import { WEBUI_BASE_PATH } from '$lib/constants';
 
 	const dispatch = createEventDispatcher();
 
@@ -54,7 +55,7 @@
 		});
 
 		if (res) {
-			goto(`/c/${res.id}`);
+			goto(WEBUI_BASE_PATH+`/c/${res.id}`);
 
 			currentChatPage.set(1);
 			await chats.set(await getChatList(localStorage.token, $currentChatPage));
@@ -99,7 +100,7 @@
 				: selected
 					? 'bg-gray-100 dark:bg-gray-950'
 					: ' group-hover:bg-gray-100 dark:group-hover:bg-gray-950'}  whitespace-nowrap text-ellipsis"
-			href="/c/{chat.id}"
+			href="{WEBUI_BASE_PATH}/c/{chat.id}"
 			on:click={() => {
 				dispatch('select');
 

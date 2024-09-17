@@ -1,4 +1,5 @@
 <script lang="ts">
+        import { WEBUI_BASE_PATH } from '$lib/constants';
 	import { getContext, onMount, tick } from 'svelte';
 	import Modal from '$lib/components/common/Modal.svelte';
 	const i18n = getContext('i18n');
@@ -58,7 +59,7 @@
 							<div class="text-sm dark:text-gray-400">
 								<a
 									href={document?.metadata?.file_id
-										? `/api/v1/files/${document?.metadata?.file_id}/content`
+										? WEBUI_BASE_PATH+`/api/v1/files/${document?.metadata?.file_id}/content`
 										: document.source.name.includes('http')
 											? document.source.name
 											: `#`}

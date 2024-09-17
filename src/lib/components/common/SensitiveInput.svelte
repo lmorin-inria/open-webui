@@ -25,7 +25,7 @@
 		class={showButtonClassName}
 		on:click={(e) => {
 			e.preventDefault();
-			show = !show;
+			show = show;
 		}}
 	>
 		{#if show}

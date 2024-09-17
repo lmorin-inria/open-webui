@@ -12,6 +12,7 @@
 	import { getModels } from '$lib/apis';
 	import { compareVersion, extractFrontmatter } from '$lib/utils';
 	import { WEBUI_VERSION } from '$lib/constants';
+        import { WEBUI_BASE_PATH } from '$lib/constants';
 
 	const i18n = getContext('i18n');
 
@@ -59,7 +60,7 @@
 		if (id) {
 			func = await getFunctionById(localStorage.token, id).catch((error) => {
 				toast.error(error);
-				goto('/workspace/functions');
+				goto(WEBUI_BASE_PATH+'/workspace/functions');
 				return null;
 			});
 

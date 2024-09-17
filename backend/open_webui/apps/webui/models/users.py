@@ -1,6 +1,7 @@
 import time
 from typing import Optional
 
+from open_webui.env import WEBUI_DEFAULT_USER_ICON
 from open_webui.apps.webui.internal.db import Base, JSONField, get_db
 from open_webui.apps.webui.models.chats import Chats
 from pydantic import BaseModel, ConfigDict
@@ -80,7 +81,7 @@ class UsersTable:
         id: str,
         name: str,
         email: str,
-        profile_image_url: str = "/user.png",
+        profile_image_url: str = WEBUI_DEFAULT_USER_ICON,
         role: str = "pending",
         oauth_sub: Optional[str] = None,
     ) -> Optional[UserModel]:

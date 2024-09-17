@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+from open_webui.env import WEBUI_DEFAULT_USER_ICON
 
 from fastapi import FastAPI
 
@@ -27,7 +28,7 @@ def mock_user(app: FastAPI, **kwargs):
             "name": "John Doe",
             "email": "john.doe@openwebui.com",
             "role": "user",
-            "profile_image_url": "/user.png",
+            "profile_image_url": WEBUI_DEFAULT_USER_ICON,
             "last_active_at": 1627351200,
             "updated_at": 1627351200,
             "created_at": 162735120,

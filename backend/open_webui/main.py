@@ -60,6 +60,7 @@ from open_webui.config import (
     ENABLE_OPENAI_API,
     ENV,
     FRONTEND_BUILD_DIR,
+    FRONTEND_APP_ROOT,
     MODEL_FILTER_LIST,
     OAUTH_MERGE_ACCOUNTS_BY_EMAIL,
     OAUTH_PROVIDERS,
@@ -88,6 +89,7 @@ from open_webui.env import (
     WEBUI_SESSION_COOKIE_SAME_SITE,
     WEBUI_SESSION_COOKIE_SECURE,
     WEBUI_URL,
+    WEBUI_DEFAULT_USER_ICON,
 )
 from fastapi import (
     Depends,
@@ -179,6 +181,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
+    root_path=FRONTEND_APP_ROOT,
     docs_url="/docs" if ENV == "dev" else None, redoc_url=None, lifespan=lifespan
 )
 
@@ -1086,7 +1089,7 @@ async def chat_completed(form_data: dict, user=Depends(get_verified_user)):
         {
             "chat_id": data["chat_id"],
             "message_id": data["id"],
-            "session_id": data["session_id"],
+            "session_id": data["session_id"] if "session_id" in data else None,
         }
     )
 
@@ -1094,7 +1097,7 @@ async def chat_completed(form_data: dict, user=Depends(get_verified_user)):
         {
             "chat_id": data["chat_id"],
             "message_id": data["id"],
-            "session_id": data["session_id"],
+            "session_id": data["session_id"] if "session_id" in data else None,
         }
     )
 
@@ -2206,7 +2209,7 @@ async def oauth_callback(provider: str, request: Request, response: Response):
                     log.error(f"Error downloading profile image '{picture_url}': {e}")
                     picture_url = ""
             if not picture_url:
-                picture_url = "/user.png"
+                picture_url = WEBUI_DEFAULT_USER_ICON
             username_claim = webui_app.state.config.OAUTH_USERNAME_CLAIM
             role = (
                 "admin"

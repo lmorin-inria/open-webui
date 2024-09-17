@@ -2,10 +2,13 @@ import { browser, dev } from '$app/environment';
 // import { version } from '../../package.json';
 
 export const APP_NAME = 'Open WebUI';
+export const WEBUI_PREFIX = '@a21e259c-1c80-4d6b-928f-89716d576c13@';
+export const WEBUI_BASE_PATH = '/'+WEBUI_PREFIX+'/app';
 
 export const WEBUI_HOSTNAME = browser ? (dev ? `${location.hostname}:8080` : ``) : '';
-export const WEBUI_BASE_URL = browser ? (dev ? `http://${WEBUI_HOSTNAME}` : ``) : ``;
+export const WEBUI_BASE_URL = (browser ? (dev ? `http://${WEBUI_HOSTNAME}` : ``) : ``)+'/'+WEBUI_PREFIX;
 export const WEBUI_API_BASE_URL = `${WEBUI_BASE_URL}/api/v1`;
+export const WEBUI_DEFAULT_USER_ICON = '/'+WEBUI_PREFIX+'/user.png';
 
 export const OLLAMA_API_BASE_URL = `${WEBUI_BASE_URL}/ollama`;
 export const OPENAI_API_BASE_URL = `${WEBUI_BASE_URL}/openai`;

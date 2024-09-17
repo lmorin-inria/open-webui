@@ -25,7 +25,13 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-COPY . .
+COPY src src
+RUN mv src/routes src/@a21e259c-1c80-4d6b-928f-89716d576c13@
+RUN mkdir -p src/routes ; mv src/@a21e259c-1c80-4d6b-928f-89716d576c13@ src/routes/@a21e259c-1c80-4d6b-928f-89716d576c13@
+RUN cd src/routes && for f in app.css  app.d.ts  app.html  lib  tailwind.css ; do ln -s ../$f; done
+COPY static static
+COPY scripts/prepare-pyodide.js ./scripts/prepare-pyodide.js
+COPY *.js *.json *.ts .npmrc CHANGELOG.md ./
 ENV APP_BUILD_HASH=${BUILD_HASH}
 RUN npm run build
 
@@ -148,6 +154,7 @@ COPY --chown=$UID:$GID --from=build /app/package.json /app/package.json
 
 # copy backend files
 COPY --chown=$UID:$GID ./backend .
+RUN cp -p /app/build/index.html /app/build/index.html.am
 
 EXPOSE 8080
 

@@ -4,6 +4,7 @@
 	import { openDB, deleteDB } from 'idb';
 	import fileSaver from 'file-saver';
 	import mermaid from 'mermaid';
+        import { WEBUI_BASE_PATH } from '$lib/constants';
 
 	const { saveAs } = fileSaver;
 
@@ -55,7 +56,7 @@
 
 	onMount(async () => {
 		if ($user === undefined) {
-			await goto('/auth');
+			await goto(WEBUI_BASE_PATH+'/auth');
 		} else if (['user', 'admin'].includes($user.role)) {
 			try {
 				// Check if IndexedDB exists
