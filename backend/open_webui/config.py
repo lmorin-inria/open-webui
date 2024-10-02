@@ -190,12 +190,12 @@ T = TypeVar("T")
 
 
 class PersistentConfig(Generic[T]):
-    def __init__(self, env_name: str, config_path: str, env_value: T):
+    def __init__(self, env_name: str, config_path: str, env_value: T, force: bool = False):
         self.env_name = env_name
         self.config_path = config_path
         self.env_value = env_value
         self.config_value = get_config_value(config_path)
-        if self.config_value is not None:
+        if self.config_value is not None and not force:
             log.info(f"'{env_name}' loaded from the latest database entry")
             self.value = self.config_value
         else:
@@ -584,7 +584,7 @@ LITELLM_CONFIG_PATH = f"{DATA_DIR}/litellm/config.yaml"
 ENABLE_OLLAMA_API = PersistentConfig(
     "ENABLE_OLLAMA_API",
     "ollama.enable",
-    os.environ.get("ENABLE_OLLAMA_API", "True").lower() == "true",
+    os.environ.get("ENABLE_OLLAMA_API", "True").lower() == "true", True
 )
 
 OLLAMA_API_BASE_URL = os.environ.get(
@@ -630,7 +630,7 @@ OLLAMA_BASE_URLS = OLLAMA_BASE_URLS if OLLAMA_BASE_URLS != "" else OLLAMA_BASE_U
 
 OLLAMA_BASE_URLS = [url.strip() for url in OLLAMA_BASE_URLS.split(";")]
 OLLAMA_BASE_URLS = PersistentConfig(
-    "OLLAMA_BASE_URLS", "ollama.base_urls", OLLAMA_BASE_URLS
+    "OLLAMA_BASE_URLS", "ollama.base_urls", OLLAMA_BASE_URLS, True
 )
 
 ####################################
@@ -641,7 +641,7 @@ OLLAMA_BASE_URLS = PersistentConfig(
 ENABLE_OPENAI_API = PersistentConfig(
     "ENABLE_OPENAI_API",
     "openai.enable",
-    os.environ.get("ENABLE_OPENAI_API", "True").lower() == "true",
+    os.environ.get("ENABLE_OPENAI_API", "True").lower() == "true", True
 )
 
 
@@ -657,7 +657,7 @@ OPENAI_API_KEYS = OPENAI_API_KEYS if OPENAI_API_KEYS != "" else OPENAI_API_KEY
 
 OPENAI_API_KEYS = [url.strip() for url in OPENAI_API_KEYS.split(";")]
 OPENAI_API_KEYS = PersistentConfig(
-    "OPENAI_API_KEYS", "openai.api_keys", OPENAI_API_KEYS
+    "OPENAI_API_KEYS", "openai.api_keys", OPENAI_API_KEYS, True
 )
 
 OPENAI_API_BASE_URLS = os.environ.get("OPENAI_API_BASE_URLS", "")
@@ -670,7 +670,7 @@ OPENAI_API_BASE_URLS = [
     for url in OPENAI_API_BASE_URLS.split(";")
 ]
 OPENAI_API_BASE_URLS = PersistentConfig(
-    "OPENAI_API_BASE_URLS", "openai.api_base_urls", OPENAI_API_BASE_URLS
+    "OPENAI_API_BASE_URLS", "openai.api_base_urls", OPENAI_API_BASE_URLS, True
 )
 
 OPENAI_API_KEY = ""
@@ -711,7 +711,7 @@ DEFAULT_LOCALE = PersistentConfig(
 )
 
 DEFAULT_MODELS = PersistentConfig(
-    "DEFAULT_MODELS", "ui.default_models", os.environ.get("DEFAULT_MODELS", None)
+    "DEFAULT_MODELS", "ui.default_models", os.environ.get("DEFAULT_MODELS", None), True
 )
 
 DEFAULT_PROMPT_SUGGESTIONS = PersistentConfig(
@@ -1110,12 +1110,12 @@ RAG_TEMPLATE = PersistentConfig(
 RAG_OPENAI_API_BASE_URL = PersistentConfig(
     "RAG_OPENAI_API_BASE_URL",
     "rag.openai_api_base_url",
-    os.getenv("RAG_OPENAI_API_BASE_URL", OPENAI_API_BASE_URL),
+    os.getenv("RAG_OPENAI_API_BASE_URL", OPENAI_API_BASE_URL), True
 )
 RAG_OPENAI_API_KEY = PersistentConfig(
     "RAG_OPENAI_API_KEY",
     "rag.openai_api_key",
-    os.getenv("RAG_OPENAI_API_KEY", OPENAI_API_KEY),
+    os.getenv("RAG_OPENAI_API_KEY", OPENAI_API_KEY), True
 )
 
 ENABLE_RAG_LOCAL_WEB_FETCH = (

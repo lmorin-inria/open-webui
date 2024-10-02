@@ -158,7 +158,7 @@ RUN cp -p /app/build/index.html /app/build/index.html.am
 
 EXPOSE 8080
 
-HEALTHCHECK CMD curl --silent --fail http://localhost:${PORT:-8080}/health | jq -ne 'input.status == true' || exit 1
+HEALTHCHECK CMD curl --silent --fail http://localhost:${PORT:-8080}/${ROOT_PATH}/health | jq -ne 'input.status == true' || exit 1
 
 USER $UID:$GID
 

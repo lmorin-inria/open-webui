@@ -2310,6 +2310,9 @@ async def healthcheck_with_db():
     Session.execute(text("SELECT 1;")).all()
     return {"status": True}
 
+@app.get("/")
+async def root_redir():
+    return RedirectResponse(url=FRONTEND_APP_ROOT+"/app", status_code=status.HTTP_302_FOUND)
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.mount("/cache", StaticFiles(directory=CACHE_DIR), name="cache")
