@@ -296,20 +296,21 @@
 								<div class="flex border-b border-gray-100 dark:border-gray-800 w-full">
 									<input
 										class="px-3 py-1.5 text-xs w-full bg-transparent outline-none border-r border-gray-100 dark:border-gray-800"
-										placeholder={$i18n.t('Title (e.g. Tell me a fun fact)')}
+										placeholder={$i18n.t('Title (e.g. Donne moi un fait historique surprenant)')}
 										bind:value={prompt.title[0]}
 									/>
 
 									<input
 										class="px-3 py-1.5 text-xs w-full bg-transparent outline-none border-r border-gray-100 dark:border-gray-800"
-										placeholder={$i18n.t('Subtitle (e.g. about the Roman Empire)')}
+										placeholder={$i18n.t('Subtitle (e.g. surprenante histoire)')}
 										bind:value={prompt.title[1]}
 									/>
 								</div>
 
-								<input
-									class="px-3 py-1.5 text-xs w-full bg-transparent outline-none border-r border-gray-100 dark:border-gray-800"
-									placeholder={$i18n.t('Prompt (e.g. Tell me a fun fact about the Roman Empire)')}
+								<textarea
+									class="px-3 py-1.5 text-xs w-full bg-transparent outline-none border-r border-gray-100 dark:border-gray-800 resize-none"
+									placeholder={$i18n.t('Prompt (e.g. Donne moi un fait historique surprenant)')}
+									rows="3"
 									bind:value={prompt.content}
 								/>
 							</div>

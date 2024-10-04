@@ -19,7 +19,9 @@ export const activeUserCount: Writable<null | number> = writable(null);
 export const USAGE_POOL: Writable<null | string[]> = writable(null);
 
 export const theme = writable('system');
+
 export const chatId = writable('');
+export const chatTitle = writable('');
 
 export const chats = writable([]);
 export const pinnedChats = writable([]);
@@ -40,6 +42,9 @@ export const showSidebar = writable(false);
 export const showSettings = writable(false);
 export const showArchivedChats = writable(false);
 export const showChangelog = writable(false);
+
+export const showControls = writable(false);
+export const showOverview = writable(false);
 export const showCallOverlay = writable(false);
 
 export const temporaryChatEnabled = writable(false);
