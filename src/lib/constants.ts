@@ -9,6 +9,8 @@ export const WEBUI_HOSTNAME = browser ? (dev ? `${location.hostname}:8080` : ``)
 export const WEBUI_BASE_URL = (browser ? (dev ? `http://${WEBUI_HOSTNAME}` : ``) : ``)+'/'+WEBUI_PREFIX;
 export const WEBUI_API_BASE_URL = `${WEBUI_BASE_URL}/api/v1`;
 export const WEBUI_DEFAULT_USER_ICON = '/'+WEBUI_PREFIX+'/user.png';
+export const WEBUI_FAVICON = '/'+WEBUI_PREFIX+'/favicon.png';
+export const WEBUI_DOGEICON = '/'+WEBUI_PREFIX+'/doge.png';
 
 export const OLLAMA_API_BASE_URL = `${WEBUI_BASE_URL}/ollama`;
 export const OPENAI_API_BASE_URL = `${WEBUI_BASE_URL}/openai`;

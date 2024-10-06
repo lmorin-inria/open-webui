@@ -3,7 +3,7 @@
 
 	import { toast } from 'svelte-sonner';
 	import Sortable from 'sortablejs';
-        import { WEBUI_BASE_PATH } from '$lib/constants';
+        import { WEBUI_BASE_PATH, WEBUI_FAVICON } from '$lib/constants';
 
 	import fileSaver from 'file-saver';
 	const { saveAs } = fileSaver;
@@ -382,7 +382,7 @@
 							: ''} "
 					>
 						<img
-							src={model?.info?.meta?.profile_image_url ?? WEBUI_BASE_PATH+'/static/favicon.png'}
+							src={model?.info?.meta?.profile_image_url ?? WEBUI_FAVICON}
 							alt="modelfile profile"
 							class=" rounded-full w-full h-auto object-cover"
 						/>

@@ -52,7 +52,7 @@
 		socket.set(_socket);
 
 		_socket.on('connect_error', (err) => {
-			console.log('connect_error', err);
+			//console.log('connect_error', err);
 		});
 
 		_socket.on('connect', () => {

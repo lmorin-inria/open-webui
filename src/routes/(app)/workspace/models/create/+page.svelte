@@ -3,7 +3,7 @@
 	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';
 	import { settings, user, config, models, tools, functions } from '$lib/stores';
-        import { WEBUI_BASE_PATH } from '$lib/constants';
+        import { WEBUI_BASE_PATH, WEBUI_FAVICON } from '$lib/constants';
 
 	import TurndownService from 'turndown';
 
@@ -149,7 +149,7 @@
 				...info,
 				meta: {
 					...info.meta,
-					profile_image_url: info.meta.profile_image_url ?? WEBUI_BASE_PATH+'/static/favicon.png',
+					profile_image_url: info.meta.profile_image_url ?? WEBUI_FAVICON,
 					suggestion_prompts: info.meta.suggestion_prompts
 						? info.meta.suggestion_prompts.filter((prompt) => prompt.content !== '')
 						: null

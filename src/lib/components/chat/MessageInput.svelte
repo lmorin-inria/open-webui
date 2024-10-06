@@ -2,7 +2,7 @@
 	import { toast } from 'svelte-sonner';
 	import { onMount, tick, getContext, createEventDispatcher } from 'svelte';
 	const dispatch = createEventDispatcher();
-        import { WEBUI_BASE_PATH } from '$lib/constants';
+        import { WEBUI_BASE_PATH, WEBUI_PREFIX } from '$lib/constants';
 
 	import {
 		type Model,
@@ -314,8 +314,8 @@
 								src={$models.find((model) => model.id === atSelectedModel.id)?.info?.meta
 									?.profile_image_url ??
 									($i18n.language === 'dg-DG'
-										? WEBUI_BASE_PATH+`/doge.png`
-										: `${WEBUI_BASE_URL}/static/favicon.png`)}
+										? `/${WEBUI_PREFIX}/doge.png`
+										: `/${WEBUI_PREFIX}/favicon.png`)}
 							/>
 							<div>
 								Talking to <span class=" font-medium">{atSelectedModel.name}</span>

@@ -20,8 +20,7 @@
 		cleanText,
 		getMessageContentParts
 	} from '$lib/utils';
-	import { WEBUI_BASE_URL } from '$lib/constants';
-        import { WEBUI_BASE_PATH } from '$lib/constants';
+        import { WEBUI_FAVICON, WEBUI_DOGEICON } from '$lib/constants';
 
 	import Name from './Name.svelte';
 	import ProfileImage from './ProfileImage.svelte';
@@ -337,7 +336,7 @@
 	>
 		<ProfileImage
 			src={model?.info?.meta?.profile_image_url ??
-				($i18n.language === 'dg-DG' ? WEBUI_BASE_PATH+`/doge.png` : `${WEBUI_BASE_URL}/static/favicon.png`)}
+				($i18n.language === 'dg-DG' ? WEBUI_DOGEICON : WEBUI_FAVICON)}
 		/>
 
 		<div class="w-full overflow-hidden pl-1">

@@ -2,7 +2,7 @@
 	import { v4 as uuidv4 } from 'uuid';
 	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';
-        import { WEBUI_BASE_PATH } from '$lib/constants';
+        import { WEBUI_BASE_PATH, WEBUI_FAVICON } from '$lib/constants';
 
 	import { onMount, getContext } from 'svelte';
 	import { page } from '$app/stores';
@@ -49,7 +49,7 @@
 		base_model_id: null,
 		name: '',
 		meta: {
-			profile_image_url: WEBUI_BASE_PATH+'/static/favicon.png',
+			profile_image_url: WEBUI_FAVICON,
 			description: '',
 			suggestion_prompts: null,
 			tags: []

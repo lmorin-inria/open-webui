@@ -73,4 +73,7 @@ if [ -n "$SPACE_ID" ]; then
   export WEBUI_URL=${SPACE_HOST}/${ROOT_PATH}
 fi
 
-WEBUI_SECRET_KEY="$WEBUI_SECRET_KEY" FRONTEND_APP_ROOT=/${ROOT_PATH} exec uvicorn open_webui.main:app --host "$HOST" --port "$PORT" --forwarded-allow-ips '*'
+WEBUI_SECRET_KEY="$WEBUI_SECRET_KEY" \
+		FRONTEND_APP_ROOT=/${ROOT_PATH} \
+		ENABLE_RAG_WEB_SEARCH=true \
+		exec uvicorn open_webui.main:app --host "$HOST" --port "$PORT" --forwarded-allow-ips '*'

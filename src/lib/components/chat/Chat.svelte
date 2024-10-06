@@ -12,7 +12,7 @@
 
 	import type { Unsubscriber, Writable } from 'svelte/store';
 	import type { i18n as i18nType } from 'i18next';
-	import { WEBUI_BASE_URL } from '$lib/constants';
+        import { WEBUI_BASE_URL, WEBUI_PREFIX } from '$lib/constants';
         import { WEBUI_BASE_PATH } from '$lib/constants';
 
 	import {
@@ -1112,7 +1112,7 @@
 									if ($settings.notificationEnabled && !document.hasFocus()) {
 										const notification = new Notification(`${model.id}`, {
 											body: responseMessage.content,
-											icon: `${WEBUI_BASE_URL}/static/favicon.png`
+											icon: `/${WEBUI_PREFIX}/favicon.png`
 										});
 									}
 
@@ -1439,7 +1439,7 @@
 				if ($settings.notificationEnabled && !document.hasFocus()) {
 					const notification = new Notification(`${model.id}`, {
 						body: responseMessage.content,
-						icon: `${WEBUI_BASE_URL}/static/favicon.png`
+						icon: `/${WEBUI_PREFIX}/favicon.png`
 					});
 				}
 

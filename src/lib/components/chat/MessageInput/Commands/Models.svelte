@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { createEventDispatcher, onMount } from 'svelte';
 	import { tick, getContext } from 'svelte';
-        import { WEBUI_BASE_PATH } from '$lib/constants';
+        import { WEBUI_FAVICON } from '$lib/constants';
 
 	import { models } from '$lib/stores';
 
@@ -76,7 +76,7 @@
 						>
 							<div class="flex font-medium text-black dark:text-gray-100 line-clamp-1">
 								<img
-									src={model?.info?.meta?.profile_image_url ?? WEBUI_BASE_PATH+'/static/favicon.png'}
+									src={model?.info?.meta?.profile_image_url ?? WEBUI_FAVICON}
 									alt={model?.name ?? model.id}
 									class="rounded-full size-6 items-center mr-2"
 								/>

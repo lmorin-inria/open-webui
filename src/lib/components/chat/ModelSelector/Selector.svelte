@@ -2,7 +2,7 @@
 	import { DropdownMenu } from 'bits-ui';
 	import { marked } from 'marked';
 	import Fuse from 'fuse.js';
-        import { WEBUI_BASE_PATH } from '$lib/constants';
+        import { WEBUI_FAVICON } from '$lib/constants';
 
 	import { flyAndScale } from '$lib/utils/transitions';
 	import { createEventDispatcher, onMount, getContext, tick } from 'svelte';
@@ -318,7 +318,7 @@
 									<div class="line-clamp-1">
 										<div class="flex items-center min-w-fit">
 											<img
-												src={item.model?.info?.meta?.profile_image_url ?? WEBUI_BASE_PATH+'/static/favicon.png'}
+												src={item.model?.info?.meta?.profile_image_url ?? WEBUI_FAVICON}
 												alt="Model"
 												class="rounded-full size-5 flex items-center mr-2"
 											/>

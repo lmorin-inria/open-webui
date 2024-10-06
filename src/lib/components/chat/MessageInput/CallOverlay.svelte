@@ -1,5 +1,5 @@
 <script lang="ts">
-        import { WEBUI_BASE_PATH } from '$lib/constants';
+        import { WEBUI_FAVICON } from '$lib/constants';
 	import { config, models, settings, showCallOverlay } from '$lib/stores';
 	import { onMount, tick, getContext, onDestroy, createEventDispatcher } from 'svelte';
 	import { DropdownMenu } from 'bits-ui';
@@ -656,7 +656,7 @@
 		await stopCamera();
 	});
 
-  const FAVICON = WEBUI_BASE_PATH+'/static/favicon.png';
+  const FAVICON = WEBUI_FAVICON;
 </script>
 
 {#if $showCallOverlay}
