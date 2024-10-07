@@ -95,7 +95,7 @@
 				: (user?.profile_image_url ?? WEBUI_DEFAULT_USER_ICON)}
 		/>
 	{/if}
-	<div class="w-full overflow-hidden pl-1">
+	<div class="w-full w-0 pl-1">
 		{#if !($settings?.chatBubble ?? true)}
 			<div>
 				<Name>
@@ -128,6 +128,7 @@
 								<img src={file.url} alt="input" class=" max-h-96 rounded-lg" draggable="false" />
 							{:else}
 								<FileItem
+									item={file}
 									url={file.url}
 									name={file.name}
 									type={file.type}

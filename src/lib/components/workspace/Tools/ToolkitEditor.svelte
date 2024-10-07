@@ -1,8 +1,8 @@
 <script>
-	import { getContext, createEventDispatcher, onMount } from 'svelte';
-        import { WEBUI_BASE_PATH } from '$lib/constants';
+	import { getContext, createEventDispatcher, onMount, tick } from 'svelte';
 
 	const i18n = getContext('i18n');
+        import { WEBUI_BASE_PATH } from '$lib/constants';
 
 	import CodeEditor from '$lib/components/common/CodeEditor.svelte';
 	import { goto } from '$app/navigation';
@@ -23,6 +23,15 @@
 		description: ''
 	};
 	export let content = '';
+	let _content = '';
+
+	$: if (content) {
+		updateContent();
+	}
+
+	const updateContent = () => {
+		_content = content;
+	};
 
 	$: if (name && !edit && !clone) {
 		id = name.replace(/\s+/g, '_').toLowerCase();
@@ -143,10 +152,18 @@ class Tools:
 
 	const submitHandler = async () => {
 		if (codeEditor) {
+			content = _content;
+			await tick();
+
 			const res = await codeEditor.formatPythonCodeHandler();
+			await tick();
+
+			content = _content;
+			await tick();
 
 			if (res) {
 				console.log('Code formatted successfully');
+
 				saveHandler();
 			}
 		}
@@ -225,9 +242,13 @@ class Tools:
 
 				<div class="mb-2 flex-1 overflow-auto h-0 rounded-lg">
 					<CodeEditor
-						bind:value={content}
 						bind:this={codeEditor}
+						value={content}
 						{boilerplate}
+						lang="python"
+						on:change={(e) => {
+							_content = e.detail.value;
+						}}
 						on:save={() => {
 							if (formElement) {
 								formElement.requestSubmit();
